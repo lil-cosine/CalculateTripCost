@@ -1,3 +1,24 @@
 .env
 
 __pycache__/
+
+/drive-cost-calculator/node_modules
+/drive-cost-calculator/.pnp
+/drive-cost-calculator/.pnp.js
+
+# testing
+/drive-cost-calculator/coverage
+
+# production
+/drive-cost-calculator/build
+
+# misc
+/drive-cost-calculator/.DS_Store
+/drive-cost-calculator/.env.local
+/drive-cost-calculator/.env.development.local
+/drive-cost-calculator/.env.test.local
+/drive-cost-calculator/.env.production.local
+
+/drive-cost-calculator/npm-debug.log*
+/drive-cost-calculator/yarn-debug.log*
+/drive-cost-calculator/yarn-error.log*
