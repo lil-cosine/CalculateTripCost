@@ -1,39 +1,41 @@
-import React, { useState } from 'react';
-import axios from 'axios';
+import React, { useState } from "react";
+import axios from "axios";
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = "http://localhost:8000";
 
-function Calculator(){
-
+function Calculator() {
   const [formData, setFormData] = useState({
     miles: "",
     mpg_city: "",
     mpg_highway: "",
     highway_percent: 50,
-    state_code: 'NC',
-  })
+    state_code: "NC",
+  });
 
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [history, setHistory] = useState([]);
 
-  const handleChange = (e)=>{
-    setFormData({...formData, [e.target.name]: e.target.value});
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
+    setError("");
     setResult(null);
 
-    try{
-      const response = await axios.post(`${API_BASE_URL}/api/calculate/`, formData);
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/calculate/`,
+        formData,
+      );
       setResult(response.data);
-    } catch(err){
-      setError(err.response?.data?.detail||'An unexpected error occurred');
-    } finally{
+    } catch (err) {
+      setError(err.response?.data?.detail || "An unexpected error occurred");
+    } finally {
       setLoading(false);
     }
   };
@@ -43,11 +45,11 @@ function Calculator(){
       const res = await axios.get(`${API_BASE_URL}/api/history/?limit=10`);
       setHistory(res.data);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to fetch history');
+      setError(err.response?.data?.detail || "Failed to fetch history");
     }
   };
 
-   return (
+  return (
     <div className="calculator">
       <h1>Drive Cost Calculator</h1>
       <form onSubmit={handleSubmit}>
@@ -89,20 +91,24 @@ function Calculator(){
             name="highway_percent"
             min="0"
             max="100"
-            value={formData.highway_percentage}
+            value={formData.highway_percent}
             onChange={handleChange}
           />
-          <span>{formData.highway_percentage}%</span>
+          <span>{formData.highway_percent}%</span>
         </div>
         <div>
           <label>State:</label>
-          <select name="state_code" value={formData.state_code} onChange={handleChange}>
+          <select
+            name="state_code"
+            value={formData.state_code}
+            onChange={handleChange}
+          >
             <option value="NC">North Carolina</option>
             {/* Add more states as you add them to your backend series_id_map */}
           </select>
         </div>
         <button type="submit" disabled={loading}>
-          {loading ? 'Calculating...' : 'Calculate Cost'}
+          {loading ? "Calculating..." : "Calculate Cost"}
         </button>
       </form>
 
@@ -111,17 +117,29 @@ function Calculator(){
       {result && (
         <div className="result">
           <h2>Trip Cost Breakdown</h2>
-          <p><strong>Blended Fuel Efficiency:</strong> {result.blended_mpg} MPG</p>
-          <p><strong>Gasoline Needed:</strong> {result.gallons_used} gallons</p>
-          <p><strong>Current Avg Gas Price in {formData.state_code}:</strong> ${result.gas_price.toFixed(3)}/gallon</p>
-          <h3>Total Estimated Cost: <span style={{color: 'green'}}>${result.total_cost.toFixed(2)}</span></h3>
+          <p>
+            <strong>Blended Fuel Efficiency:</strong> {result.blended_mpg} MPG
+          </p>
+          <p>
+            <strong>Gasoline Needed:</strong> {result.gallons_used} gallons
+          </p>
+          <p>
+            <strong>Current Avg Gas Price in {formData.state_code}:</strong> $
+            {result.gas_price.toFixed(3)}/gallon
+          </p>
+          <h3>
+            Total Estimated Cost:{" "}
+            <span style={{ color: "green" }}>
+              ${result.total_cost.toFixed(2)}
+            </span>
+          </h3>
         </div>
       )}
-      
+
       <div>
         <button onClick={fetchHistory}>Show Last 10 Trips</button>
       </div>
-      
+
       {history.length > 0 && (
         <div className="history">
           <h2>Last 10 Trips</h2>
@@ -159,10 +177,8 @@ function Calculator(){
           </table>
         </div>
       )}
-
     </div>
   );
 }
 
 export default Calculator;
-

@@ -50,7 +50,7 @@ async def init_db():
         #        last_updated TIMESTAMP NOT NULL
         #    )
         #""")
-        
+
         #await connection.execute("""
         #    CREATE TABLE IF NOT EXISTS calculations(
         #        id SERIAL PRIMARY KEY,
@@ -66,7 +66,7 @@ async def init_db():
         #        calculated_at TIMESTAMP NOT NULL
         #    )
         #""")
-        
+
         print("database inited")
 
 @app.on_event("startup")
@@ -115,10 +115,10 @@ async def get_gas_prices(state_code: str, connection) -> float:
         data = response.json()
 
         price_data = data.get("response", {}.get("data", []))
- 
+
         if not price_data:
             raise HTTPException(status_code=404, detail=f"No recent gas price data was found")
-        
+
         try:
             current_price = float(price_data['data'][0]["value"])
         except (TypeError, ValueError):
@@ -154,7 +154,7 @@ def calculate_trip_cost(trip_data: TripData, gas_price: float):
         blended_mpg = round(blended_mpg, 1),
         gallons_used = round(gallons_used, 2),
         total_cost = round(total_cost, 2),
-        gas_price = gas_price  
+        gas_price = gas_price
     )
 
 @app.post("/api/calculate/")
@@ -166,11 +166,11 @@ async def calculate_drive_cost(trip_data: TripData):
             gas_price = await get_gas_prices(trip_data.state_code, connection)
 
             result = calculate_trip_cost(trip_data, gas_price)
-            
+
             await connection.execute(
                 """
-                INSERT INTO calculations 
-                (miles, mpg_city, mpg_highway, highway_percent, state_code, 
+                INSERT INTO calculations
+                (miles, mpg_city, mpg_highway, highway_percent, state_code,
                  blended_mpg, gallons_used, total_cost, gas_price, calculated_at)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                 """,
@@ -188,7 +188,7 @@ async def calculate_drive_cost(trip_data: TripData):
 
 @app.get("/api/history/")
 async def get_calculation_history(limit: int = 10):
-    
+
     pool = await get_db_connection()
     async with pool.acquire() as connection:
         try:
@@ -218,6 +218,3 @@ async def health_check():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-
-
-            
