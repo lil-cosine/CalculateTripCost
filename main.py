@@ -1,9 +1,8 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
-from typing import Optional
 import requests
 import asyncpg
 import os
@@ -16,6 +15,9 @@ class TripData(BaseModel):
     mpg_highway: int
     highway_percent: int
     state_code: str
+    drive_type: str = "required"  # New field
+    reason: str = ""  # New field
+    start_time: datetime  # New field
 
 class CalculationResult(BaseModel):
     blended_mpg: float
@@ -38,43 +40,51 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 EIA_API_KEY = os.getenv("EIA_API_KEY")
 
 async def get_db_connection():
-    return await asyncpg.create_pool(DATABASE_URL)
+    return await asyncpg.create_pool(
+        DATABASE_URL,
+        min_size=1,
+        max_size=5,
+        max_inactive_connection_lifetime=300
+    )
 
 async def init_db():
     pool = await get_db_connection()
     async with pool.acquire() as connection:
-        #await connection.execute("""
-        #    CREATE TABLE IF NOT EXISTS gas_prices(
-        #        state TEXT PRIMARY KEY,
-        #        price DECIMAL NOT NULL,
-        #        last_updated TIMESTAMP NOT NULL
-        #    )
-        #""")
+        # Create table with new columns if they don't exist
+        await connection.execute("""
+            CREATE TABLE IF NOT EXISTS calculations (
+                id SERIAL PRIMARY KEY,
+                miles FLOAT NOT NULL,
+                mpg_city INTEGER NOT NULL,
+                mpg_highway INTEGER NOT NULL,
+                highway_percent INTEGER NOT NULL,
+                state_code VARCHAR(2) NOT NULL,
+                blended_mpg FLOAT NOT NULL,
+                gallons_used FLOAT NOT NULL,
+                total_cost FLOAT NOT NULL,
+                gas_price FLOAT NOT NULL,
+                calculated_at TIMESTAMP NOT NULL,
+                drive_type VARCHAR(20) DEFAULT 'required',
+                reason TEXT DEFAULT '',
+                start_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
 
-        #await connection.execute("""
-        #    CREATE TABLE IF NOT EXISTS calculations(
-        #        id SERIAL PRIMARY KEY,
-        #        miles DECIMAL NOT NULL,
-        #        mpg_city INTEGER NOT NULL,
-        #        mpg_highway INTEGER NOT NULL,
-        #        highway_percent INTEGER NOT NULL,
-        #        state_code TEXT NOT NULL,
-        #        blended_mpg DECIMAL NOT NULL,
-        #        gallons_used DECIMAL NOT NULL,
-        #        total_cost DECIMAL NOT NULL,
-        #        gas_price DECIMAL NOT NULL,
-        #        calculated_at TIMESTAMP NOT NULL
-        #    )
-        #""")
-
-        print("database inited")
+        # Create gas_prices table if it doesn't exist
+        await connection.execute("""
+            CREATE TABLE IF NOT EXISTS gas_prices (
+                state VARCHAR(2) PRIMARY KEY,
+                price FLOAT NOT NULL,
+                last_updated TIMESTAMP NOT NULL
+            )
+        """)
+    print("Database initialized")
 
 @app.on_event("startup")
 async def startup_event():
     await init_db()
 
 async def get_gas_prices(state_code: str, connection) -> float:
-
     now = datetime.utcnow()
 
     cached_data = await connection.fetchrow(
@@ -89,7 +99,11 @@ async def get_gas_prices(state_code: str, connection) -> float:
     print(f"Fetching newest price data for {state_code}")
 
     series_id_map = {
-        "NC" : "EMM_EPMR_PTE_R10_DPG"
+        "NC": "EMM_EPMR_PTE_R10_DPG",
+        "SC": "EMM_EPMR_PTE_R10_DPG",  # Placeholder - update with correct series ID
+        "VA": "EMM_EPMR_PTE_R10_DPG",  # Placeholder - update with correct series ID
+        "GA": "EMM_EPMR_PTE_R10_DPG",  # Placeholder - update with correct series ID
+        "TN": "EMM_EPMR_PTE_R10_DPG",  # Placeholder - update with correct series ID
     }
 
     series_id = series_id_map.get(state_code)
@@ -114,16 +128,15 @@ async def get_gas_prices(state_code: str, connection) -> float:
         response.raise_for_status()
         data = response.json()
 
-        price_data = data.get("response", {}.get("data", []))
+        price_data = data.get("response", {}).get("data", [])
 
         if not price_data:
-            raise HTTPException(status_code=404, detail=f"No recent gas price data was found")
+            raise HTTPException(status_code=404, detail="No recent gas price data was found")
 
         try:
-            current_price = float(price_data['data'][0]["value"])
-        except (TypeError, ValueError):
-            raise HTTPException(status_code=500, detail=f"Invalid gas price value: {latest_row.get('value')}")
-
+            current_price = float(price_data[0]["value"])
+        except (TypeError, ValueError, IndexError):
+            raise HTTPException(status_code=500, detail="Invalid gas price data format")
 
         await connection.execute("""
             INSERT INTO gas_prices(state, price, last_updated)
@@ -159,42 +172,40 @@ def calculate_trip_cost(trip_data: TripData, gas_price: float):
 
 @app.post("/api/calculate/")
 async def calculate_drive_cost(trip_data: TripData):
-    print(TripData)
     pool = await get_db_connection()
     async with pool.acquire() as connection:
         try:
             gas_price = await get_gas_prices(trip_data.state_code, connection)
-
             result = calculate_trip_cost(trip_data, gas_price)
 
             await connection.execute(
                 """
                 INSERT INTO calculations
                 (miles, mpg_city, mpg_highway, highway_percent, state_code,
-                 blended_mpg, gallons_used, total_cost, gas_price, calculated_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                 blended_mpg, gallons_used, total_cost, gas_price, calculated_at,
+                 drive_type, reason, start_time)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
                 """,
                 trip_data.miles, trip_data.mpg_city, trip_data.mpg_highway,
                 trip_data.highway_percent, trip_data.state_code,
                 result.blended_mpg, result.gallons_used, result.total_cost,
-                result.gas_price, datetime.utcnow()
+                result.gas_price, datetime.utcnow(),
+                trip_data.drive_type, trip_data.reason, trip_data.start_time
             )
 
             return result
         except HTTPException as he:
             raise he
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"An internal server error occured: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"An internal server error occurred: {str(e)}")
 
 @app.get("/api/history/")
-async def get_calculation_history(limit: int = 10):
-
+async def get_calculation_history():
     pool = await get_db_connection()
     async with pool.acquire() as connection:
         try:
             rows = await connection.fetch(
-                "SELECT * FROM calculations by ORDER BY calculated_at DESC LIMIT $1",
-                limit
+                "SELECT * FROM calculations ORDER BY calculated_at DESC"
             )
 
             history = []
@@ -211,7 +222,7 @@ async def health_check():
         pool = await get_db_connection()
         async with pool.acquire() as connection:
             result = await connection.fetchval("SELECT 1")
-            return {"status":"healthy", "database":"connected"}
+            return {"status": "healthy", "database": "connected"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database connection failed: {str(e)}")
 

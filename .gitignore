@@ -5,6 +5,7 @@ __pycache__/
 /drive-cost-calculator/node_modules
 /drive-cost-calculator/.pnp
 /drive-cost-calculator/.pnp.js
+/drive-cost-calculator/.next
 
 # testing
 /drive-cost-calculator/coverage
