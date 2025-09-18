@@ -1,10 +1,11 @@
 import NavBar from "../Components/NavBar";
 import Calculator from "../Components/Calculator";
 import History from "../Components/History";
+import Stats from "../Components/Stats";
 import { useState } from "react";
 
 function App() {
-  const [activeSection, setActiveSection] = useState("add");
+  const [activeSection, setActiveSection] = useState("stats");
 
   const renderSection = () => {
     switch (activeSection) {
@@ -13,7 +14,7 @@ function App() {
       case "past":
         return <History />;
       case "stats":
-        return;
+        return <Stats />;
       case "mod":
         return;
       default:

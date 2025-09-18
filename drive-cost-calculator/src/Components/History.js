@@ -75,175 +75,188 @@ export default function History() {
 
   const formatDateTime = (dateString) => {
     const date = new Date(dateString);
-
-    // Format time as HH:MM
     let hours = date.getHours();
     const minutes = date.getMinutes().toString().padStart(2, "0");
     const ampm = hours >= 12 ? "pm" : "am";
-
-    // Convert to 12-hour format
     hours = hours % 12;
-    hours = hours ? hours : 12; // Convert 0 to 12
+    hours = hours ? hours : 12;
     const time = `${hours}:${minutes} ${ampm}`;
-
-    // Format date as m/d/y
     const month = (date.getMonth() + 1).toString();
     const day = date.getDate().toString();
     const year = date.getFullYear().toString().slice(-2);
     const dateFormatted = `${month}/${day}/${year}`;
-
     return `${dateFormatted} at ${time}`;
   };
 
+  const formatCurrency = (amount) => `$${parseFloat(amount).toFixed(2)}`;
+  const formatNumber = (num) => parseFloat(num).toFixed(1);
+
   return (
-    <div className="p-4">
+    <div className="p-6 max-w-7xl mx-auto">
       {error && (
-        <div className="error p-3 bg-red-100 text-red-700 rounded mb-4">
-          Error: {error}
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
+          <strong>Error:</strong> {error}
         </div>
       )}
 
-      <div className="mb-6">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Drive History</h1>
+          <p className="text-gray-600 mt-1">
+            {allDrives.length} total drives • Page {currentPage} of {totalPages}
+          </p>
+        </div>
         <button
           onClick={fetchAllDrives}
           disabled={loading}
-          className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded disabled:opacity-50"
+          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors duration-200 disabled:opacity-50 flex items-center space-x-2"
         >
-          {loading ? "Loading..." : "Refresh All Drives"}
+          {loading ? (
+            <>
+              <svg
+                className="animate-spin h-4 w-4 text-white"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                ></circle>
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
+              </svg>
+              <span>Loading...</span>
+            </>
+          ) : (
+            <>
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+              <span>Refresh Data</span>
+            </>
+          )}
         </button>
-        <span className="ml-4 text-gray-600">
-          {allDrives.length} drives total
-        </span>
       </div>
 
       {allDrives.length > 0 && (
-        <div className="history">
-          <h2 className="text-xl font-bold mb-4">
-            Drive History (Page {currentPage} of {totalPages})
-          </h2>
-
+        <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-full border-collapse border border-gray-300">
-              <thead>
-                <tr className="bg-gray-100">
-                  <th
-                    className="border border-gray-300 p-2 cursor-pointer hover:bg-gray-200"
-                    onClick={() => handleSort("start_time")}
-                  >
-                    Date {renderSortDirection("start_time")}
-                  </th>
-                  <th
-                    className="border border-gray-300 p-2 cursor-pointer hover:bg-gray-200"
-                    onClick={() => handleSort("miles")}
-                  >
-                    Miles {renderSortDirection("miles")}
-                  </th>
-                  <th
-                    className="border border-gray-300 p-2 cursor-pointer hover:bg-gray-200"
-                    onClick={() => handleSort("mpg_city")}
-                  >
-                    City MPG {renderSortDirection("mpg_city")}
-                  </th>
-                  <th
-                    className="border border-gray-300 p-2 cursor-pointer hover:bg-gray-200"
-                    onClick={() => handleSort("mpg_highway")}
-                  >
-                    Hwy MPG {renderSortDirection("mpg_highway")}
-                  </th>
-                  <th
-                    className="border border-gray-300 p-2 cursor-pointer hover:bg-gray-200"
-                    onClick={() => handleSort("highway_percent")}
-                  >
-                    Hwy % {renderSortDirection("highway_percent")}
-                  </th>
-                  <th
-                    className="border border-gray-300 p-2 cursor-pointer hover:bg-gray-200"
-                    onClick={() => handleSort("state_code")}
-                  >
-                    State {renderSortDirection("state_code")}
-                  </th>
-                  <th
-                    className="border border-gray-300 p-2 cursor-pointer hover:bg-gray-200"
-                    onClick={() => handleSort("blended_mpg")}
-                  >
-                    Blended MPG {renderSortDirection("blended_mpg")}
-                  </th>
-                  <th
-                    className="border border-gray-300 p-2 cursor-pointer hover:bg-gray-200"
-                    onClick={() => handleSort("gallons_used")}
-                  >
-                    Gallons {renderSortDirection("gallons_used")}
-                  </th>
-                  <th
-                    className="border border-gray-300 p-2 cursor-pointer hover:bg-gray-200"
-                    onClick={() => handleSort("gas_price")}
-                  >
-                    Gas Price {renderSortDirection("gas_price")}
-                  </th>
-                  <th
-                    className="border border-gray-300 p-2 cursor-pointer hover:bg-gray-200"
-                    onClick={() => handleSort("total_cost")}
-                  >
-                    Total Cost {renderSortDirection("total_cost")}
-                  </th>
-                  <th
-                    className="border border-gray-300 p-2 cursor-pointer hover:bg-gray-200"
-                    onClick={() => handleSort("drive_type")}
-                  >
-                    Type {renderSortDirection("drive_type")}
-                  </th>
-                  <th
-                    className="border border-gray-300 p-2 cursor-pointer hover:bg-gray-200"
-                    onClick={() => handleSort("reason")}
-                  >
-                    Reason {renderSortDirection("reason")}
-                  </th>
+            <table className="min-w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  {[
+                    { key: "id", label: "id", width: "w-20" },
+                    { key: "start_time", label: "Date", width: "w-48" },
+                    { key: "miles", label: "Miles", width: "w-20" },
+                    { key: "highway_percent", label: "Hwy %", width: "w-20" },
+                    { key: "state_code", label: "State", width: "w-16" },
+                    { key: "blended_mpg", label: "Blended MPG", width: "w-28" },
+                    { key: "gallons_used", label: "Gallons", width: "w-20" },
+                    { key: "gas_price", label: "Gas Price", width: "w-24" },
+                    { key: "total_cost", label: "Total Cost", width: "w-28" },
+                    { key: "drive_type", label: "Type", width: "w-28" },
+                    { key: "reason", label: "Reason", width: "w-48" },
+                  ].map(({ key, label, width }) => (
+                    <th
+                      key={key}
+                      className={`px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors duration-150 ${width}`}
+                      onClick={() => handleSort(key)}
+                    >
+                      <div className="flex items-center space-x-1">
+                        <span>{label}</span>
+                        <span className="text-gray-400">
+                          {renderSortDirection(key)}
+                        </span>
+                      </div>
+                    </th>
+                  ))}
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-gray-200">
                 {currentDrives.map((trip, idx) => (
                   <tr
                     key={idx}
-                    className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}
+                    className="hover:bg-gray-50 transition-colors duration-150"
                   >
-                    <td className="border border-gray-300 p-2">
-                      {formatDateTime(trip.start_time)}
+                    <td className="px-4 py-3 text-sm text-gray-900 text-right">
+                      {formatNumber(trip.id)}
                     </td>
-                    <td className="border border-gray-300 p-2">{trip.miles}</td>
-                    <td className="border border-gray-300 p-2">
-                      {trip.mpg_city}
+                    <td className="px-4 py-3 text-sm text-gray-900">
+                      <div className="flex flex-col">
+                        <span className="font-medium text-gray-900">
+                          {formatDateTime(trip.start_time).split(" at ")[0]}
+                        </span>
+                        <span className="text-gray-500 text-xs">
+                          {formatDateTime(trip.start_time).split(" at ")[1]}
+                        </span>
+                      </div>
                     </td>
-                    <td className="border border-gray-300 p-2">
-                      {trip.mpg_highway}
+                    <td className="px-4 py-3 text-sm text-gray-900 text-right">
+                      {formatNumber(trip.miles)}
                     </td>
-                    <td className="border border-gray-300 p-2">
-                      {trip.highway_percent}
+                    <td className="px-4 py-3 text-sm text-gray-900 text-right">
+                      {trip.highway_percent}%
                     </td>
-                    <td className="border border-gray-300 p-2">
-                      {trip.state_code}
+                    <td className="px-4 py-3 text-sm text-gray-900 font-medium text-center">
+                      <span className="inline-flex items-center justify-center w-8 h-8 bg-blue-100 text-blue-800 rounded-full text-xs font-bold">
+                        {trip.state_code}
+                      </span>
                     </td>
-                    <td className="border border-gray-300 p-2">
-                      {trip.blended_mpg}
+                    <td className="px-4 py-3 text-sm text-gray-900 text-right">
+                      <span className="inline-flex items-center px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                        {formatNumber(trip.blended_mpg)}
+                      </span>
                     </td>
-                    <td className="border border-gray-300 p-2">
-                      {trip.gallons_used}
+                    <td className="px-4 py-3 text-sm text-gray-900 text-right">
+                      {formatNumber(trip.gallons_used)}
                     </td>
-                    <td className="border border-gray-300 p-2">
-                      ${trip.gas_price}
+                    <td className="px-4 py-3 text-sm text-gray-900 text-right">
+                      <span className="text-orange-600 font-medium">
+                        {formatCurrency(trip.gas_price)}
+                      </span>
                     </td>
-                    <td className="border border-gray-300 p-2 font-medium">
-                      ${trip.total_cost}
+                    <td className="px-4 py-3 text-sm text-right">
+                      <span className="font-semibold text-gray-900">
+                        {formatCurrency(trip.total_cost)}
+                      </span>
                     </td>
-                    <td className="border border-gray-300 p-2 capitalize">
-                      {trip.drive_type === "required"
-                        ? "Required"
-                        : "Recreational"}
+                    <td className="px-4 py-3 text-sm">
+                      <span
+                        className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium capitalize ${
+                          trip.drive_type === "required"
+                            ? "bg-blue-100 text-blue-800"
+                            : "bg-purple-100 text-purple-800"
+                        }`}
+                      >
+                        {trip.drive_type}
+                      </span>
                     </td>
-                    <td
-                      className="border border-gray-300 p-2 max-w-xs truncate"
-                      title={trip.reason}
-                    >
-                      {trip.reason || "-"}
+                    <td className="px-4 py-3 text-sm text-gray-600 max-w-xs">
+                      <div className="truncate" title={trip.reason}>
+                        {trip.reason || (
+                          <span className="text-gray-400 italic">
+                            No reason provided
+                          </span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -253,64 +266,86 @@ export default function History() {
 
           {/* Pagination Controls */}
           {totalPages > 1 && (
-            <div className="flex justify-center items-center mt-6 space-x-2">
-              <button
-                onClick={() => handlePageChange(1)}
-                disabled={currentPage === 1}
-                className="px-3 py-1 border rounded disabled:opacity-50 hover:bg-gray-100"
-              >
-                &laquo;
-              </button>
-              <button
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="px-3 py-1 border rounded disabled:opacity-50 hover:bg-gray-100"
-              >
-                &lsaquo;
-              </button>
+            <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+              <div className="flex-1 flex justify-between items-center">
+                <div className="text-sm text-gray-700">
+                  Showing <span className="font-medium">{startIndex + 1}</span>{" "}
+                  to{" "}
+                  <span className="font-medium">
+                    {Math.min(startIndex + itemsPerPage, sortedDrives.length)}
+                  </span>{" "}
+                  of <span className="font-medium">{sortedDrives.length}</span>{" "}
+                  drives
+                </div>
 
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                // Show pages around current page
-                let pageNum;
-                if (currentPage <= 3) {
-                  pageNum = i + 1;
-                } else if (currentPage >= totalPages - 2) {
-                  pageNum = totalPages - 4 + i;
-                } else {
-                  pageNum = currentPage - 2 + i;
-                }
-
-                if (pageNum > totalPages || pageNum < 1) return null;
-
-                return (
-                  <button
-                    key={pageNum}
-                    onClick={() => handlePageChange(pageNum)}
-                    className={`px-3 py-1 border rounded ${
-                      currentPage === pageNum
-                        ? "bg-blue-500 text-white"
-                        : "hover:bg-gray-100"
-                    }`}
+                <div className="flex items-center space-x-2">
+                  <nav
+                    className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px"
+                    aria-label="Pagination"
                   >
-                    {pageNum}
-                  </button>
-                );
-              })}
+                    <button
+                      onClick={() => handlePageChange(1)}
+                      disabled={currentPage === 1}
+                      className="relative inline-flex items-center px-3 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span className="sr-only">First</span>
+                      &laquo;
+                    </button>
+                    <button
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                      className="relative inline-flex items-center px-3 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span className="sr-only">Previous</span>
+                      &lsaquo;
+                    </button>
 
-              <button
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1 border rounded disabled:opacity-50 hover:bg-gray-100"
-              >
-                &rsaquo;
-              </button>
-              <button
-                onClick={() => handlePageChange(totalPages)}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1 border rounded disabled:opacity-50 hover:bg-gray-100"
-              >
-                &raquo;
-              </button>
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNum;
+                      if (currentPage <= 3) {
+                        pageNum = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i;
+                      } else {
+                        pageNum = currentPage - 2 + i;
+                      }
+
+                      if (pageNum > totalPages || pageNum < 1) return null;
+
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => handlePageChange(pageNum)}
+                          className={`relative inline-flex items-center px-3 py-2 border text-sm font-medium ${
+                            currentPage === pageNum
+                              ? "z-10 bg-blue-50 border-blue-500 text-blue-600"
+                              : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50"
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+
+                    <button
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                      className="relative inline-flex items-center px-3 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span className="sr-only">Next</span>
+                      &rsaquo;
+                    </button>
+                    <button
+                      onClick={() => handlePageChange(totalPages)}
+                      disabled={currentPage === totalPages}
+                      className="relative inline-flex items-center px-3 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span className="sr-only">Last</span>
+                      &raquo;
+                    </button>
+                  </nav>
+                </div>
+              </div>
             </div>
           )}
         </div>

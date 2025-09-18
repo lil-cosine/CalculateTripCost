@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+from typing import Optional
 import requests
 import asyncpg
 import os
@@ -216,12 +217,153 @@ async def get_calculation_history():
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to fetch history: {str(e)}")
 
+@app.get("/api/stats/")
+async def get_drive_stats():
+    pool = await get_db_connection()
+    async with pool.acquire() as connection:
+        try:
+            stats = await connection.fetchrow("""
+                SELECT
+                    COUNT(id) as num_drives,
+                    COALESCE(SUM(total_cost), 0) as sum_costs,
+                    COALESCE(AVG(total_cost), 0) as avg_cost,
+                    COALESCE(SUM(miles), 0) as total_miles,
+                    COUNT(CASE WHEN drive_type = 'required' THEN 1 END) as required_drives_count,
+                    COALESCE(AVG(blended_mpg), 0) as overall_efficiency,
+                    COALESCE(AVG(gas_price), 0) as avg_gas_price
+                FROM calculations
+            """)
+            return [dict(stats)] if stats else []
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to fetch stats: {str(e)}")
+
+@app.get("/api/available-months/")
+async def get_available_months():
+    pool = await get_db_connection()
+    async with pool.acquire() as connection:
+        try:
+            months = await connection.fetch("""
+                SELECT DISTINCT DATE_TRUNC('month', start_time) as month
+                FROM calculations
+                ORDER BY month DESC
+            """)
+            return [row['month'].isoformat() for row in months]
+        except Exception as e:
+            raise HTTPException(500, f"Failed to fetch available months: {str(e)}")
+
+@app.get("/api/monthly-summary/")
+async def get_monthly_summary(month: Optional[str] = None):
+    pool = await get_db_connection()
+    async with pool.acquire() as connection:
+        try:
+            if month:
+                # Get specific month and previous month for comparison
+                target_month = datetime.fromisoformat(month.replace('Z', '+00:00'))
+                prev_month = target_month - timedelta(days=30)
+
+                query = """
+                    WITH monthly_data AS (
+                        SELECT
+                            DATE_TRUNC('month', start_time) as month,
+                            COUNT(*) as trip_count,
+                            SUM(total_cost) as total_spent,
+                            AVG(total_cost) as avg_cost,
+                            SUM(miles) as total_miles
+                        FROM calculations
+                        WHERE DATE_TRUNC('month', start_time) IN ($1, $2)
+                        GROUP BY month
+                        ORDER BY month DESC
+                    )
+                    SELECT * FROM monthly_data
+                """
+                results = await connection.fetch(query, target_month, prev_month)
+            else:
+                # Get ALL months instead of just the latest 2
+                query = """
+                    SELECT
+                        DATE_TRUNC('month', start_time) as month,
+                        COUNT(*) as trip_count,
+                        SUM(total_cost) as total_spent,
+                        AVG(total_cost) as avg_cost,
+                        SUM(miles) as total_miles
+                    FROM calculations
+                    GROUP BY month
+                    ORDER BY month DESC
+                """
+                results = await connection.fetch(query)
+
+            return [dict(row) for row in results]
+
+        except Exception as e:
+            raise HTTPException(500, f"Failed to fetch monthly summary: {str(e)}")
+
+@app.get("/api/monthly-data/")
+async def get_monthly_data():
+    pool = await get_db_connection()
+    try:
+        async with pool.acquire() as connection:
+            query = """
+                WITH monthly_data AS (
+                    SELECT
+                        DATE_TRUNC('month', start_time) as month,
+                        COUNT(*) as trip_count,
+                        SUM(total_cost) as total_spent,
+                        AVG(total_cost) as avg_cost,
+                        SUM(miles) as total_miles
+                    FROM calculations
+                    GROUP BY month
+                    ORDER BY month DESC
+                )
+                SELECT * FROM monthly_data
+            """
+            results = await connection.fetch(query)
+            data = []
+
+            for result in results:
+                data.append(dict(result))
+
+            return data
+
+    except Exception as e:
+        raise HTTPException(500, f"Failed to fetch monthly summary: {str(e)}")
+
+@app.get("/api/update-entry/")
+async def update_entry(id: Optional[int] = None):
+    print(id)
+    pool = await get_db_connection()
+    async with pool.acquire() as connection:
+        try:
+            query = """
+            UPDATE calculations
+                SET miles = 5000
+            WHERE id = $1
+            """
+            await connection.execute(query, id)
+
+        except Exception as e:
+            raise HTTPException(500, f"Failed to fetch monthly summary: {str(e)}")
+
+@app.get("/api/delete-entry/")
+async def delete_entry(id: Optional[int] = None):
+    print(id)
+    pool = await get_db_connection()
+    async with pool.acquire() as connection:
+        try:
+            query = """
+            DELETE FROM calculations WHERE id = $1
+            """
+            await connection.execute(query, id)
+
+        except Exception as e:
+            raise HTTPException(500, f"Failed to fetch monthly summary: {str(e)}")
+
+
 @app.get("/api/health/")
 async def health_check():
     try:
         pool = await get_db_connection()
         async with pool.acquire() as connection:
-            result = await connection.fetchval("SELECT 1")
+            await connection.fetchval("SELECT 1")
             return {"status": "healthy", "database": "connected"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database connection failed: {str(e)}")
