@@ -17,7 +17,7 @@ function NavBar({ activeSection, setActiveSection }) {
             >
               <div className="text-2xl">🚗</div>
               <span className="ml-2 text-xl font-semibold text-gray-800">
-                DriveCost
+                CalculateTripCost
               </span>
             </div>
           </div>
