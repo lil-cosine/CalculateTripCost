@@ -1,4 +1,4 @@
-# DriveCost - Driving Expense Tracker
+# CalculateTripCost - Driving Expense Tracker
 
 A full-stack web application for tracking and analyzing driving expenses. Calculate trip costs, view statistics, and understand your driving spending patterns.
 
