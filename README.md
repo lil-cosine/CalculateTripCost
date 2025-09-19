@@ -161,6 +161,8 @@ The application tracks:
 * More charts
 * Improved Stats page layout
 * Ability to download a monthly report PDF
+* Create tests
+* Improve API security
 
 ## Contributing
 1. Fork the repository
