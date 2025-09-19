@@ -16,9 +16,9 @@ class TripData(BaseModel):
     mpg_highway: int
     highway_percent: int
     state_code: str
-    drive_type: str = "required"  # New field
-    reason: str = ""  # New field
-    start_time: datetime  # New field
+    drive_type: str = "required"
+    reason: str = ""
+    start_time: datetime
 
 class CalculationResult(BaseModel):
     blended_mpg: float
@@ -51,7 +51,6 @@ async def get_db_connection():
 async def init_db():
     pool = await get_db_connection()
     async with pool.acquire() as connection:
-        # Create table with new columns if they don't exist
         await connection.execute("""
             CREATE TABLE IF NOT EXISTS calculations (
                 id SERIAL PRIMARY KEY,
@@ -71,7 +70,6 @@ async def init_db():
             )
         """)
 
-        # Create gas_prices table if it doesn't exist
         await connection.execute("""
             CREATE TABLE IF NOT EXISTS gas_prices (
                 state VARCHAR(2) PRIMARY KEY,
@@ -101,10 +99,6 @@ async def get_gas_prices(state_code: str, connection) -> float:
 
     series_id_map = {
         "NC": "EMM_EPMR_PTE_R10_DPG",
-        "SC": "EMM_EPMR_PTE_R10_DPG",  # Placeholder - update with correct series ID
-        "VA": "EMM_EPMR_PTE_R10_DPG",  # Placeholder - update with correct series ID
-        "GA": "EMM_EPMR_PTE_R10_DPG",  # Placeholder - update with correct series ID
-        "TN": "EMM_EPMR_PTE_R10_DPG",  # Placeholder - update with correct series ID
     }
 
     series_id = series_id_map.get(state_code)
@@ -230,7 +224,9 @@ async def get_drive_stats():
                     COALESCE(SUM(miles), 0) as total_miles,
                     COUNT(CASE WHEN drive_type = 'required' THEN 1 END) as required_drives_count,
                     COALESCE(AVG(blended_mpg), 0) as overall_efficiency,
-                    COALESCE(AVG(gas_price), 0) as avg_gas_price
+                    COALESCE(AVG(gas_price), 0) as avg_gas_price,
+                    SUM(CASE WHEN drive_type = 'required' THEN total_cost END) as required_drives_cost,
+                    SUM(CASE WHEN drive_type = 'recreational' THEN total_cost END) as recreational_drives_cost
                 FROM calculations
             """)
             return [dict(stats)] if stats else []
@@ -257,7 +253,6 @@ async def get_monthly_summary(month: Optional[str] = None):
     async with pool.acquire() as connection:
         try:
             if month:
-                # Get specific month and previous month for comparison
                 target_month = datetime.fromisoformat(month.replace('Z', '+00:00'))
                 prev_month = target_month - timedelta(days=30)
 
@@ -268,7 +263,10 @@ async def get_monthly_summary(month: Optional[str] = None):
                             COUNT(*) as trip_count,
                             SUM(total_cost) as total_spent,
                             AVG(total_cost) as avg_cost,
-                            SUM(miles) as total_miles
+                            SUM(miles) as total_miles,
+                            COUNT(CASE WHEN drive_type = 'required' THEN 1 END) as required_drives_count,
+                            SUM(CASE WHEN drive_type = 'required' THEN total_cost END) as required_drives_cost,
+                            SUM(CASE WHEN drive_type = 'recreational' THEN total_cost END) as recreational_drives_cost
                         FROM calculations
                         WHERE DATE_TRUNC('month', start_time) IN ($1, $2)
                         GROUP BY month
@@ -278,7 +276,6 @@ async def get_monthly_summary(month: Optional[str] = None):
                 """
                 results = await connection.fetch(query, target_month, prev_month)
             else:
-                # Get ALL months instead of just the latest 2
                 query = """
                     SELECT
                         DATE_TRUNC('month', start_time) as month,
@@ -327,36 +324,85 @@ async def get_monthly_data():
     except Exception as e:
         raise HTTPException(500, f"Failed to fetch monthly summary: {str(e)}")
 
-@app.get("/api/update-entry/")
-async def update_entry(id: Optional[int] = None):
-    print(id)
+@app.put("/api/update-entry/{entry_id}")
+async def update_entry(entry_id: int, trip_data: TripData):
     pool = await get_db_connection()
     async with pool.acquire() as connection:
         try:
             query = """
             UPDATE calculations
-                SET miles = 5000
-            WHERE id = $1
+            SET
+                miles = $1,
+                mpg_city = $2,
+                mpg_highway = $3,
+                highway_percent = $4,
+                state_code = $5,
+                drive_type = $6,
+                reason = $7,
+                start_time = $8,
+                blended_mpg = $9,
+                gallons_used = $10,
+                total_cost = $11,
+                gas_price = $12,
+                calculated_at = CURRENT_TIMESTAMP  -- Update the timestamp too
+            WHERE id = $13
+            RETURNING *
             """
-            await connection.execute(query, id)
 
+            gas_price = await get_gas_prices(trip_data.state_code, connection)
+            result = calculate_trip_cost(trip_data, gas_price)
+
+            updated_row = await connection.fetchrow(
+                query,
+                trip_data.miles,
+                trip_data.mpg_city,
+                trip_data.mpg_highway,
+                trip_data.highway_percent,
+                trip_data.state_code,
+                trip_data.drive_type,
+                trip_data.reason,
+                trip_data.start_time,
+                result.blended_mpg,
+                result.gallons_used,
+                result.total_cost,
+                result.gas_price,
+                entry_id
+            )
+
+            if not updated_row:
+                raise HTTPException(status_code=404, detail="Entry not found")
+
+            return dict(updated_row)
+
+        except HTTPException:
+            raise
         except Exception as e:
-            raise HTTPException(500, f"Failed to fetch monthly summary: {str(e)}")
+            raise HTTPException(500, f"Failed to update entry: {str(e)}")
 
-@app.get("/api/delete-entry/")
-async def delete_entry(id: Optional[int] = None):
-    print(id)
+@app.put("/api/delete-entry/{entry_id}")
+async def delete_entry(entry_id: int):
     pool = await get_db_connection()
     async with pool.acquire() as connection:
         try:
-            query = """
-            DELETE FROM calculations WHERE id = $1
-            """
-            await connection.execute(query, id)
+            existing_entry = await connection.fetchrow(
+                "SELECT id FROM calculations WHERE id = $1",
+                entry_id
+            )
 
+            if not existing_entry:
+                raise HTTPException(status_code=404, detail="Entry not found")
+
+            await connection.execute(
+                "DELETE FROM calculations WHERE id = $1",
+                entry_id
+            )
+
+            return {"message": f"Entry {entry_id} deleted successfully"}
+
+        except HTTPException:
+            raise
         except Exception as e:
-            raise HTTPException(500, f"Failed to fetch monthly summary: {str(e)}")
-
+            raise HTTPException(500, f"Failed to delete entry: {str(e)}")
 
 @app.get("/api/health/")
 async def health_check():

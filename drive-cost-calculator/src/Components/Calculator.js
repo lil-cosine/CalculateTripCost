@@ -3,16 +3,8 @@ import axios from "axios";
 
 const API_BASE_URL = "http://localhost:8000";
 
-// Car database
-const cars = [
-  { id: 1, name: "Ford Focus", mpg_city: 26, mpg_highway: 38 },
-  { id: 2, name: "Toyota Camry", mpg_city: 28, mpg_highway: 39 },
-  { id: 3, name: "Honda Civic", mpg_city: 30, mpg_highway: 38 },
-  { id: 4, name: "SUV (Average)", mpg_city: 20, mpg_highway: 27 },
-  { id: 5, name: "Truck (Average)", mpg_city: 17, mpg_highway: 23 },
-];
+const cars = [{ id: 1, name: "Ford Focus", mpg_city: 26, mpg_highway: 38 }];
 
-// Drive types
 const driveTypes = [
   { id: "required", name: "Required (Work/Errands)" },
   { id: "recreational", name: "Recreational" },
@@ -21,19 +13,18 @@ const driveTypes = [
 function Calculator() {
   const [formData, setFormData] = useState({
     miles: "",
-    car_id: "1", // Default to Ford Focus
+    car_id: "1",
     highway_percent: 50,
     state_code: "NC",
     drive_type: "required",
     reason: "",
-    start_time: new Date().toISOString().slice(0, 16), // Current datetime
+    start_time: new Date().toISOString().slice(0, 16),
   });
 
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Get selected car details
   const selectedCar =
     cars.find((car) => car.id.toString() === formData.car_id) || cars[0];
 
@@ -48,7 +39,6 @@ function Calculator() {
     setError("");
     setResult(null);
 
-    // Prepare data with car MPG values
     const submitData = {
       ...formData,
       mpg_city: selectedCar.mpg_city,

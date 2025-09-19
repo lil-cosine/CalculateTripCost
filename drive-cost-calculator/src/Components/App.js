@@ -2,6 +2,7 @@ import NavBar from "../Components/NavBar";
 import Calculator from "../Components/Calculator";
 import History from "../Components/History";
 import Stats from "../Components/Stats";
+import Modify from "../Components/Modify";
 import { useState } from "react";
 
 function App() {
@@ -16,7 +17,7 @@ function App() {
       case "stats":
         return <Stats />;
       case "mod":
-        return;
+        return <Modify />;
       default:
         return <Calculator />;
     }

@@ -39,7 +39,6 @@ const PieChart = ({ title = "", data = {} }) => {
         },
       };
 
-      // Create new chart
       const ctx = chartRef.current.getContext("2d");
       chartInstance.current = new Chart(ctx, {
         type: "bar",
@@ -48,13 +47,12 @@ const PieChart = ({ title = "", data = {} }) => {
       });
     }
 
-    // Cleanup function
     return () => {
       if (chartInstance.current) {
         chartInstance.current.destroy();
       }
     };
-  }, [data, title]); // Add data and title to dependency array
+  }, [data, title]);
 
   return (
     <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">

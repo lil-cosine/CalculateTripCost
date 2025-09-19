@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import Pie from "./Charts/Pie.js";
-import Bar from "./Charts/Bar.js"; // Assuming you have a Bar chart component
+import Bar from "./Charts/Bar.js";
 import axios from "axios";
 
 const API_BASE_URL = "http://localhost:8000";
@@ -10,14 +10,14 @@ export default function Stats() {
   const [monthlyStats, setMonthlyStats] = useState([]);
   const [availableMonths, setAvailableMonths] = useState([]);
   const [selectedMonth, setSelectedMonth] = useState(null);
-  const [monthlyData, setMonthlyData] = useState([]); // New state for monthly data
+  const [monthlyData, setMonthlyData] = useState([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     fetchDriveStats();
     fetchAvailableMonths();
-    fetchMonthlyData(); // Fetch the new monthly data
+    fetchMonthlyData();
   }, []);
 
   useEffect(() => {
@@ -146,6 +146,12 @@ export default function Stats() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
                     Recreational Drives
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                    Required Drive Cost
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                    Recreational Drive Cost
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -169,6 +175,12 @@ export default function Stats() {
                     {formatNumber(
                       driveStats.num_drives - driveStats.required_drives_count,
                     )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {formatCurrency(driveStats.required_drives_cost)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {formatCurrency(driveStats.recreational_drives_cost)}
                   </td>
                 </tr>
               </tbody>
@@ -225,6 +237,18 @@ export default function Stats() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
                     Total Miles
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                    Required Drives
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                    Recreational Drives
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                    Required Drive Cost
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                    Recreational Drive Cost
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -260,6 +284,20 @@ export default function Stats() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {formatNumber(month.total_miles)} miles
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {formatNumber(month.required_drives_count)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {formatNumber(
+                          month.trip_count - month.required_drives_count,
+                        )}{" "}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {formatCurrency(month.required_drives_cost)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {formatCurrency(month.recreational_drives_cost)}
                       </td>
                     </tr>
                   );

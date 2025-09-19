@@ -29,7 +29,6 @@ export default function History() {
     }
   };
 
-  // Handle sorting
   const handleSort = (key) => {
     let direction = "asc";
     if (sortConfig.key === key && sortConfig.direction === "asc") {
@@ -38,7 +37,6 @@ export default function History() {
     setSortConfig({ key, direction });
   };
 
-  // Sort drives based on configuration
   const sortedDrives = [...allDrives].sort((a, b) => {
     if (!sortConfig.key) return 0;
 
@@ -51,7 +49,6 @@ export default function History() {
     return 0;
   });
 
-  // Calculate pagination values
   const totalPages = Math.ceil(sortedDrives.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const currentDrives = sortedDrives.slice(
@@ -65,7 +62,6 @@ export default function History() {
     }
   };
 
-  // Render sort indicator
   const renderSortDirection = (key) => {
     if (sortConfig.key === key) {
       return sortConfig.direction === "asc" ? "↑" : "↓";
@@ -163,7 +159,6 @@ export default function History() {
               <thead className="bg-gray-50">
                 <tr>
                   {[
-                    { key: "id", label: "id", width: "w-20" },
                     { key: "start_time", label: "Date", width: "w-48" },
                     { key: "miles", label: "Miles", width: "w-20" },
                     { key: "highway_percent", label: "Hwy %", width: "w-20" },
@@ -196,9 +191,6 @@ export default function History() {
                     key={idx}
                     className="hover:bg-gray-50 transition-colors duration-150"
                   >
-                    <td className="px-4 py-3 text-sm text-gray-900 text-right">
-                      {formatNumber(trip.id)}
-                    </td>
                     <td className="px-4 py-3 text-sm text-gray-900">
                       <div className="flex flex-col">
                         <span className="font-medium text-gray-900">
