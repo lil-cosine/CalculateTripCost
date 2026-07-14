@@ -36,8 +36,8 @@ A full-stack web application for tracking and analyzing driving expenses. Calcul
 
 1. **Clone and navigate to the project**:
 ```bash
-git clone <repository-url>
-cd drive-cost-tracker
+git clone https://github.com/lil-cosine/CalculateTripCost.git
+cd CalculateTripCost
 ```
 
 2. **Set up Python virtual environment**:
@@ -78,7 +78,7 @@ uvicorn main:app --reload --port 8000
 ### Frontend Setup
 1. **Navigate to frontend directory**:
 ```bash
-cd drive-cost-calculator
+cd CalculateTripCost
 ```
 
 2. **Install Node.js dependencies**:
