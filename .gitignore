@@ -2,24 +2,24 @@
 
 __pycache__/
 
-/drive-cost-calculator/node_modules
-/drive-cost-calculator/.pnp
-/drive-cost-calculator/.pnp.js
-/drive-cost-calculator/.next
+/CalculateTripCost/node_modules
+/CalculateTripCost/.pnp
+/CalculateTripCost/.pnp.js
+/CalculateTripCost/.next
 
 # testing
-/drive-cost-calculator/coverage
+/CalculateTripCost/coverage
 
 # production
-/drive-cost-calculator/build
+/CalculateTripCost/build
 
 # misc
-/drive-cost-calculator/.DS_Store
-/drive-cost-calculator/.env.local
-/drive-cost-calculator/.env.development.local
-/drive-cost-calculator/.env.test.local
-/drive-cost-calculator/.env.production.local
+/CalculateTripCost/.DS_Store
+/CalculateTripCost/.env.local
+/CalculateTripCost/.env.development.local
+/CalculateTripCost/.env.test.local
+/CalculateTripCost/.env.production.local
 
-/drive-cost-calculator/npm-debug.log*
-/drive-cost-calculator/yarn-debug.log*
-/drive-cost-calculator/yarn-error.log*
+/CalculateTripCost/npm-debug.log*
+/CalculateTripCost/yarn-debug.log*
+/CalculateTripCost/yarn-error.log*

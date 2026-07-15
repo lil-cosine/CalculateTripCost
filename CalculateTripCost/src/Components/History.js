@@ -49,7 +49,7 @@ export default function History() {
     return 0;
   });
 
-  const totalPages = Math.ceil(sortedDrives.length / itemsPerPage);
+  const totalPages = Math.max(Math.ceil(sortedDrives.length / itemsPerPage), 1);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const currentDrives = sortedDrives.slice(
     startIndex,
