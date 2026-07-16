@@ -19,7 +19,7 @@ export default function History() {
   const fetchAllDrives = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/history/`);
+      const res = await axios.get(`${API_BASE_URL}/api/history/`, { withCredentials: true });
       setAllDrives(res.data);
       setError("");
     } catch (err) {

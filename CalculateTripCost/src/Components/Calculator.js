@@ -49,6 +49,7 @@ function Calculator() {
       const response = await axios.post(
         `${API_BASE_URL}/api/calculate/`,
         submitData,
+        { withCredentials: true }
       );
       setResult(response.data);
     } catch (err) {
