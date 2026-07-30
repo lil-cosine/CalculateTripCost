@@ -2,8 +2,10 @@ function NavBar({ activeSection, setActiveSection }) {
   const navItems = [
     { id: "stats", label: "Drive Stats", icon: "📊" },
     { id: "add", label: "Add Drive", icon: "➕" },
-    { id: "past", label: "Past Drives", icon: "📋" },
+    // { id: "past", label: "Past Drives", icon: "📋" },
     { id: "mod", label: "Database", icon: "⚙️" },
+    { id: "usr", label: "Manage Account", icon: "👤" },
+    { id: "lgout", label: "Log Out", icon: "👋"}
   ];
 
   return (

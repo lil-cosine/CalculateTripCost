@@ -5,6 +5,7 @@ import Stats from "../Components/Stats";
 import Modify from "../Components/Modify";
 import Login from "../Components/Login";
 import Register from "../Components/Register";
+import User from "../Components/User"
 import { useAuth } from "./AuthContext";
 import { useState } from "react";
 
@@ -39,6 +40,12 @@ function App() {
         return <Stats />;
       case "mod":
         return <Modify />;
+      case "usr":
+        return <User />;
+      case "lgout":
+        logout();
+        setActiveSection("stats");
+        return;
       default:
         return <Calculator />;
     }
@@ -50,10 +57,6 @@ function App() {
         activeSection={activeSection}
         setActiveSection={setActiveSection}
       />
-      <div className="user-bar">
-        <span>{user.email}</span>
-        <button onClick={logout}>Log Out</button>
-      </div>
       <div>{renderSection()}</div>
     </div>
   );

@@ -90,6 +90,16 @@ async def init_db():
         """)
 
         await connection.execute("""
+          Create Table IF NOT EXISTS cars (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          name varchar(64) NOT NULL,
+          highway_mpg FLOAT NOT NULL,
+          city_mpg FLOAT NOT NULL
+          )
+          """)
+
+        await connection.execute("""
             CREATE TABLE IF NOT EXISTS sessions (
                 token VARCHAR(64) PRIMARY KEY,
                 user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -247,6 +257,26 @@ async def logout(request: Request, response: Response):
 @app.get("/api/me/")
 async def get_me(current_user: dict = Depends(get_current_user)):
     return current_user
+
+@app.get("/api/my-cars/")
+async def getMyCars(current_user: dict = Depends(get_current_user)):
+  return
+
+@app.post("/api/add-car/")
+async def addCar(request: Request, responce: Response):
+  return
+
+@app.post("/api/modify-car/")
+async def modifyCar(request: Request, responce: Response):
+  return
+
+@app.post("/api/remove-car/")
+async def removeCar(request: Request, responce: Response):
+  return
+
+@app.post("/api/update-password/")
+async def updatePassword(request: Request, responce: Response):
+  return
 
 # ---------------------------------------------------------------------------
 # Gas price / calculation logic (unchanged)
