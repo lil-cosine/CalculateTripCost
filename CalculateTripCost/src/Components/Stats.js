@@ -13,6 +13,11 @@ export default function Stats() {
   const [availableMonths, setAvailableMonths] = useState([]);
   const [selectedMonth, setSelectedMonth] = useState(null);
   const [monthlyData, setMonthlyData] = useState([]);
+  const [viewMode, setViewMode] = useState("month"); // "month" | "range"
+  const [rangeStart, setRangeStart] = useState("");
+  const [rangeEnd, setRangeEnd] = useState("");
+  const [rangeStats, setRangeStats] = useState(null);
+  const [rangeError, setRangeError] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [downloadingAll, setDownloadingAll] = useState(false);
@@ -39,6 +44,19 @@ export default function Stats() {
       fetchMonthlyStats(selectedMonth);
     }
   }, [selectedMonth]);
+
+  useEffect(() => {
+    if (viewMode === "range" && !rangeStart && !rangeEnd) {
+      const now = new Date();
+      const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const toInputDate = (d) =>
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+          d.getDate()
+        ).padStart(2, "0")}`;
+      setRangeStart(toInputDate(firstOfMonth));
+      setRangeEnd(toInputDate(now));
+    }
+  }, [viewMode, rangeStart, rangeEnd]);
 
   const fetchDriveStats = async () => {
     setLoading(true);
@@ -76,6 +94,28 @@ export default function Stats() {
     }
   };
 
+  const fetchRangeStats = async () => {
+    if (!rangeStart || !rangeEnd) return;
+    setRangeError("");
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/stats-range/`, {
+        params: { start_date: rangeStart, end_date: rangeEnd },
+        withCredentials: true,
+      });
+      setRangeStats(res.data);
+    } catch (err) {
+      setRangeStats(null);
+      setRangeError(
+        err.response?.data?.detail || "Failed to fetch stats for the selected range"
+      );
+    }
+  };
+
+  const handleJumpToCurrentMonth = () => {
+    setViewMode("month");
+    if (currentMonth) setSelectedMonth(currentMonth);
+  };
+
   const fetchMonthlyData = async () => {
     try {
       const res = await axios.get(`${API_BASE_URL}/api/monthly-data/`, { withCredentials: true });
@@ -99,6 +139,17 @@ export default function Stats() {
     const date = new Date(dateString);
     return date.toLocaleDateString("en-US", {
       month: "short",
+      year: "numeric",
+    });
+  };
+
+  const formatDateLabel = (dateStr) => {
+    if (!dateStr) return "";
+    const [y, m, d] = dateStr.split("-").map(Number);
+    const date = new Date(y, m - 1, d);
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
       year: "numeric",
     });
   };
@@ -184,7 +235,7 @@ export default function Stats() {
         doc.addImage(dataUrl, "PNG", x, y, drawWidth, drawHeight);
       });
 
-      doc.save("driving-report.pdf");
+      doc.save("driving-stats-charts.pdf");
     } finally {
       setDownloadingAll(false);
     }
@@ -220,7 +271,7 @@ export default function Stats() {
                   d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
                 />
               </svg>
-              {downloadingAll ? "Building PDF..." : "Download Report"}
+              {downloadingAll ? "Building PDF..." : "Download All Charts (PDF)"}
             </button>
           )}
           <button
@@ -317,39 +368,110 @@ export default function Stats() {
       {/* Monthly Statistics Table */}
       {driveStats && driveStats.num_drives !== undefined && driveStats.num_drives > 0 && (
         <div className="pb-5">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold text-gray-800">
+          <div className="flex flex-wrap items-center gap-3 mb-4">
+            <h2 className="text-xl font-semibold text-gray-800 mr-2">
               Monthly Statistics
             </h2>
-            <div className="flex items-center space-x-2">
-              <label
-                htmlFor="month-select"
-                className="text-sm font-medium text-gray-700"
+
+            {/* Month / Custom Range toggle */}
+            <div className="flex items-center bg-gray-100 rounded-lg p-1">
+              <button
+                type="button"
+                onClick={() => setViewMode("month")}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors duration-150 ${
+                  viewMode === "month"
+                    ? "bg-white shadow text-blue-600"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
               >
-                Filter by Month:
-              </label>
-              <select
-                id="month-select"
-                value={selectedMonth || ""}
-                onChange={(e) => setSelectedMonth(e.target.value || null)}
-                className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                Month
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("range")}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors duration-150 ${
+                  viewMode === "range"
+                    ? "bg-white shadow text-blue-600"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
               >
-                {availableMonths.map((month) => (
-                  <option key={month} value={month}>
-                    {formatMonth(month)}
-                  </option>
-                ))}
-              </select>
+                Custom Range
+              </button>
             </div>
+
+            {viewMode === "month" ? (
+              <div className="flex items-center space-x-2">
+                <label
+                  htmlFor="month-select"
+                  className="text-sm font-medium text-gray-700"
+                >
+                  Filter by Month:
+                </label>
+                <select
+                  id="month-select"
+                  value={selectedMonth || ""}
+                  onChange={(e) => setSelectedMonth(e.target.value || null)}
+                  className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  {availableMonths.map((month) => (
+                    <option key={month} value={month}>
+                      {formatMonth(month)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="text-sm font-medium text-gray-700">From</label>
+                <input
+                  type="date"
+                  value={rangeStart}
+                  onChange={(e) => setRangeStart(e.target.value)}
+                  className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                <label className="text-sm font-medium text-gray-700">To</label>
+                <input
+                  type="date"
+                  value={rangeEnd}
+                  onChange={(e) => setRangeEnd(e.target.value)}
+                  className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                <button
+                  type="button"
+                  onClick={fetchRangeStats}
+                  disabled={!rangeStart || !rangeEnd}
+                  className="bg-blue-500 hover:bg-blue-600 text-white text-sm px-3 py-2 rounded-md transition-colors duration-150 disabled:opacity-50"
+                >
+                  Apply
+                </button>
+              </div>
+            )}
+
+            {/* Always-available shortcut back to the current month, regardless of mode */}
+            {currentMonth && !(viewMode === "month" && selectedMonth === currentMonth) && (
+              <button
+                type="button"
+                onClick={handleJumpToCurrentMonth}
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium underline-offset-2 hover:underline"
+              >
+                Jump to Current Month
+              </button>
+            )}
           </div>
 
-          {monthlyStats.length > 0 ? (
+          {rangeError && viewMode === "range" && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">
+              <strong>Error:</strong> {rangeError}
+            </div>
+          )}
+
+          {(viewMode === "month" ? monthlyStats.length > 0 : !!rangeStats) ? (
             <div className="overflow-x-auto bg-white rounded-lg shadow border border-gray-200">
               <table className="min-w-full">
                 <thead>
                   <tr className="bg-gray-50">
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                      Month
+                      {viewMode === "month" ? "Month" : "Date Range"}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
                       Trips
@@ -378,65 +500,78 @@ export default function Stats() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {monthlyStats.map((month, index) => {
-                    const isCurrentMonth = month.month === currentMonth;
-                    return (
-                      <tr
-                        key={index}
-                        className={
-                          isCurrentMonth
-                            ? "bg-blue-50 hover:bg-blue-100"
-                            : "hover:bg-gray-50"
-                        }
-                      >
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          <div className="flex items-center">
-                            {formatMonth(month.month)}
-                            {isCurrentMonth && (
-                              <span className="ml-2 bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
-                                Current
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {formatNumber(month.trip_count)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {formatCurrency(month.total_spent)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {formatCurrency(month.avg_cost)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {formatNumber(month.total_miles)} miles
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {formatNumber(month.required_drives_count)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {formatNumber(
-                            month.trip_count - month.required_drives_count,
-                          )}{" "}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {formatCurrency(month.required_drives_cost)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {formatCurrency(month.recreational_drives_cost)}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {(viewMode === "month" ? monthlyStats : [rangeStats]).map(
+                    (row, index) => {
+                      const isCurrentMonth =
+                        viewMode === "month" && row.month === currentMonth;
+                      return (
+                        <tr
+                          key={index}
+                          className={
+                            isCurrentMonth
+                              ? "bg-blue-50 hover:bg-blue-100"
+                              : "hover:bg-gray-50"
+                          }
+                        >
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            <div className="flex items-center">
+                              {viewMode === "month"
+                                ? formatMonth(row.month)
+                                : `${formatDateLabel(rangeStart)} – ${formatDateLabel(
+                                    rangeEnd
+                                  )}`}
+                              {isCurrentMonth && (
+                                <span className="ml-2 bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                                  Current
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatNumber(row.trip_count)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatCurrency(row.total_spent)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatCurrency(row.avg_cost)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatNumber(row.total_miles)} miles
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatNumber(row.required_drives_count)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatNumber(
+                              row.trip_count - row.required_drives_count,
+                            )}{" "}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatCurrency(row.required_drives_cost)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatCurrency(row.recreational_drives_cost)}
+                          </td>
+                        </tr>
+                      );
+                    },
+                  )}
                 </tbody>
               </table>
             </div>
           ) : (
             <div className="text-center py-12 bg-white rounded-lg shadow border border-gray-200">
               <div className="text-gray-400 mb-2">📊</div>
-              <p className="text-gray-500">No monthly data available yet</p>
+              <p className="text-gray-500">
+                {viewMode === "month"
+                  ? "No monthly data available yet"
+                  : "Pick a date range and click Apply to see stats"}
+              </p>
               <p className="text-gray-400 text-sm mt-1">
-                Add some drives to see statistics
+                {viewMode === "month"
+                  ? "Add some drives to see statistics"
+                  : "Results are limited to drives within the selected dates"}
               </p>
             </div>
           )}

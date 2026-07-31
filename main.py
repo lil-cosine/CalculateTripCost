@@ -41,13 +41,13 @@ class UserLogin(BaseModel):
     password: str
 
 class CarData(BaseModel):
-  name: str
-  highway_mpg: float
-  city_mpg: float
+    name: str
+    highway_mpg: float
+    city_mpg: float
 
 class PasswordUpdate(BaseModel):
-  current_password: str
-  new_password: str
+    current_password: str
+    new_password: str
 
 app = FastAPI()
 
@@ -269,65 +269,63 @@ async def get_me(current_user: dict = Depends(get_current_user)):
 
 @app.get("/api/my-cars/")
 async def get_my_cars(current_user: dict = Depends(get_current_user)):
-  pool = await get_db_connection()
-  async with pool.acquire() as connection:
-    try:
-      rows = await connection.fetch(
-        "SELECT * FROM cars WHERE user_id = $1 ORDER BY id",
-        current_user["id"]
-      )
-      return [dict(row) for row in rows]
-    except Exception as e:
-      raise HTTPException(status_code=500, detail=f"Failed to fetch cars: {str(e)}")
-
+    pool = await get_db_connection()
+    async with pool.acquire() as connection:
+        try:
+            rows = await connection.fetch(
+                "SELECT * FROM cars WHERE user_id = $1 ORDER BY id",
+                current_user["id"]
+            )
+            return [dict(row) for row in rows]
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to fetch cars: {str(e)}")
 
 @app.post("/api/add-car/")
 async def add_car(car_data: CarData, current_user: dict = Depends(get_current_user)):
-  pool = await get_db_connection()
-  async with pool.acquire() as connection:
-    try:
-      new_car = await connection.fetchrow(
-        """
-        INSERT INTO cars (user_id, name, highway_mpg, city_mpg)
-        VALUES ($1, $2, $3, $4)
-        RETURNING *
-        """,
-        current_user["id"], car_data.name, car_data.highway_mpg, car_data.city_mpg
-      )
-      return dict(new_car)
-    except Exception as e:
-      raise HTTPException(status_code=500, detail=f"Failed to add car: {str(e)}")
+    pool = await get_db_connection()
+    async with pool.acquire() as connection:
+        try:
+            new_car = await connection.fetchrow(
+                """
+                INSERT INTO cars (user_id, name, highway_mpg, city_mpg)
+                VALUES ($1, $2, $3, $4)
+                RETURNING *
+                """,
+                current_user["id"], car_data.name, car_data.highway_mpg, car_data.city_mpg
+            )
+            return dict(new_car)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to add car: {str(e)}")
 
 @app.put("/api/modify-car/{car_id}")
 async def modify_car(car_id: int, car_data: CarData, current_user: dict = Depends(get_current_user)):
-  pool = await get_db_connection()
-  async with pool.acquire() as connection:
-      try:
-          existing_car = await connection.fetchrow(
-              "SELECT id FROM cars WHERE id = $1 AND user_id = $2",
-              car_id, current_user["id"]
-          )
-          if not existing_car:
-              raise HTTPException(status_code=404, detail="Car not found")
+    pool = await get_db_connection()
+    async with pool.acquire() as connection:
+        try:
+            existing_car = await connection.fetchrow(
+                "SELECT id FROM cars WHERE id = $1 AND user_id = $2",
+                car_id, current_user["id"]
+            )
+            if not existing_car:
+                raise HTTPException(status_code=404, detail="Car not found")
 
-          updated_car = await connection.fetchrow(
-              """
-              UPDATE cars
-              SET name = $1, highway_mpg = $2, city_mpg = $3
-              WHERE id = $4 AND user_id = $5
-              RETURNING *
-              """,
-              car_data.name, car_data.highway_mpg, car_data.city_mpg,
-              car_id, current_user["id"]
-          )
-          return dict(updated_car)
-      except HTTPException:
-          raise
-      except Exception as e:
-          raise HTTPException(status_code=500, detail=f"Failed to update car: {str(e)}")
+            updated_car = await connection.fetchrow(
+                """
+                UPDATE cars
+                SET name = $1, highway_mpg = $2, city_mpg = $3
+                WHERE id = $4 AND user_id = $5
+                RETURNING *
+                """,
+                car_data.name, car_data.highway_mpg, car_data.city_mpg,
+                car_id, current_user["id"]
+            )
+            return dict(updated_car)
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to update car: {str(e)}")
 
-
-app.put("/api/remove-car/{car_id}")
+@app.put("/api/remove-car/{car_id}")
 async def remove_car(car_id: int, current_user: dict = Depends(get_current_user)):
     pool = await get_db_connection()
     async with pool.acquire() as connection:
@@ -349,34 +347,30 @@ async def remove_car(car_id: int, current_user: dict = Depends(get_current_user)
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to delete car: {str(e)}")
 
-
 @app.post("/api/update-password/")
-async def update_password(request: Request, response: Response):
-  @app.post("/api/update-password/")
-  async def update_password(password_data: PasswordUpdate, current_user: dict = Depends(get_current_user)):
-      pool = await get_db_connection()
-      async with pool.acquire() as connection:
-          try:
-              user = await connection.fetchrow(
-                  "SELECT password_hash FROM users WHERE id = $1", current_user["id"]
-              )
-              if not user or not pwd_context.verify(password_data.current_password, user["password_hash"]):
-                  raise HTTPException(status_code=401, detail="Current password is incorrect")
+async def update_password(password_data: PasswordUpdate, current_user: dict = Depends(get_current_user)):
+    pool = await get_db_connection()
+    async with pool.acquire() as connection:
+        try:
+            user = await connection.fetchrow(
+                "SELECT password_hash FROM users WHERE id = $1", current_user["id"]
+            )
+            if not user or not pwd_context.verify(password_data.current_password, user["password_hash"]):
+                raise HTTPException(status_code=401, detail="Current password is incorrect")
 
-              if len(password_data.new_password) < 8:
-                  raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+            if len(password_data.new_password) < 8:
+                raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
 
-              new_hash = pwd_context.hash(password_data.new_password)
-              await connection.execute(
-                  "UPDATE users SET password_hash = $1 WHERE id = $2",
-                  new_hash, current_user["id"]
-              )
-              return {"message": "Password updated successfully"}
-          except HTTPException:
-              raise
-          except Exception as e:
-              raise HTTPException(status_code=500, detail=f"Failed to update password: {str(e)}")
-
+            new_hash = pwd_context.hash(password_data.new_password)
+            await connection.execute(
+                "UPDATE users SET password_hash = $1 WHERE id = $2",
+                new_hash, current_user["id"]
+            )
+            return {"message": "Password updated successfully"}
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to update password: {str(e)}")
 
 # ---------------------------------------------------------------------------
 # Gas price / calculation logic (unchanged)
@@ -595,6 +589,47 @@ async def get_monthly_summary(month: Optional[str] = None, current_user: dict = 
 
         except Exception as e:
             raise HTTPException(500, f"Failed to fetch monthly summary: {str(e)}")
+
+@app.get("/api/stats-range/")
+async def get_stats_range(
+    start_date: str,
+    end_date: str,
+    current_user: dict = Depends(get_current_user),
+):
+    pool = await get_db_connection()
+    async with pool.acquire() as connection:
+        try:
+            try:
+                start = datetime.fromisoformat(start_date)
+                # Make end_date inclusive of the whole day
+                end = datetime.fromisoformat(end_date) + timedelta(days=1)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Dates must be in YYYY-MM-DD format")
+
+            if end <= start:
+                raise HTTPException(status_code=400, detail="end_date must be on or after start_date")
+
+            query = """
+                SELECT
+                    COUNT(*) as trip_count,
+                    COALESCE(SUM(total_cost), 0) as total_spent,
+                    COALESCE(AVG(total_cost), 0) as avg_cost,
+                    COALESCE(SUM(miles), 0) as total_miles,
+                    COUNT(CASE WHEN drive_type = 'required' THEN 1 END) as required_drives_count,
+                    COALESCE(SUM(CASE WHEN drive_type = 'required' THEN total_cost END), 0) as required_drives_cost,
+                    COALESCE(SUM(CASE WHEN drive_type = 'recreational' THEN total_cost END), 0) as recreational_drives_cost
+                FROM calculations
+                WHERE user_id = $1 AND start_time >= $2 AND start_time < $3
+            """
+            row = await connection.fetchrow(query, current_user["id"], start, end)
+            result = dict(row)
+            result["start_date"] = start_date
+            result["end_date"] = end_date
+            return result
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to fetch stats for range: {str(e)}")
 
 @app.get("/api/monthly-data/")
 async def get_monthly_data(current_user: dict = Depends(get_current_user)):
