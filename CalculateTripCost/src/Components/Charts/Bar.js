@@ -1,7 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import Chart from "chart.js/auto";
 
-const PieChart = ({ title = "", data = {} }) => {
+const BarChart = forwardRef(({ title = "", data = {} }, ref) => {
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
 
@@ -54,10 +54,57 @@ const PieChart = ({ title = "", data = {} }) => {
     };
   }, [data, title]);
 
+  const getImage = () => {
+    if (!chartInstance.current) return null;
+    return {
+      dataUrl: chartInstance.current.toBase64Image("image/png", 1),
+      width: chartInstance.current.canvas.width,
+      height: chartInstance.current.canvas.height,
+    };
+  };
+
+  useImperativeHandle(ref, () => ({
+    getImage,
+    title,
+  }));
+
+  const handleDownload = () => {
+    const image = getImage();
+    if (!image) return;
+    const filename = (title || "chart")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "");
+    const link = document.createElement("a");
+    link.href = image.dataUrl;
+    link.download = `${filename || "chart"}.png`;
+    link.click();
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
-      <div className="mb-4">
+      <div className="mb-4 flex items-center justify-between">
         <h2 className="text-xl font-semibold text-gray-800">{title}</h2>
+        <button
+          onClick={handleDownload}
+          className="text-sm text-gray-500 hover:text-blue-600 flex items-center gap-1 transition-colors duration-150"
+          title="Download chart as PNG"
+        >
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+            />
+          </svg>
+          Download
+        </button>
       </div>
 
       <div className="relative h-80">
@@ -65,6 +112,6 @@ const PieChart = ({ title = "", data = {} }) => {
       </div>
     </div>
   );
-};
+});
 
-export default PieChart;
+export default BarChart;
