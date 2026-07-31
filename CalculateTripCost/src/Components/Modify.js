@@ -22,7 +22,7 @@ export default function Modify() {
   const fetchAllDrives = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/history/`);
+    const res = await axios.get(`${API_BASE_URL}/api/history/`, { withCredentials: true });
       setAllDrives(res.data);
       setError("");
     } catch (err) {
@@ -48,6 +48,7 @@ export default function Modify() {
       const response = await axios.put(
         `${API_BASE_URL}/api/update-entry/${id}`,
         editData,
+        { withCredentials: true },
       );
 
       setAllDrives((prev) =>
@@ -71,7 +72,7 @@ export default function Modify() {
 
     setDeleting(id);
     try {
-      await axios.put(`${API_BASE_URL}/api/delete-entry/${id}`);
+      await axios.put(`${API_BASE_URL}/api/delete-entry/${id}`, {}, { withCredentials: true });
 
       setAllDrives((prev) => prev.filter((item) => item.id !== id));
       setError("");
@@ -127,7 +128,7 @@ export default function Modify() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
-            Modify Drive Entries
+            Previous Drives
           </h1>
           <p className="text-gray-600 mt-1">
             {allDrives.length} total drives • Page {currentPage} of {totalPages}

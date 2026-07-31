@@ -35,7 +35,7 @@ export default function Stats() {
   const fetchDriveStats = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/stats/`);
+      const res = await axios.get(`${API_BASE_URL}/api/stats/`, { withCredentials: true });
       setDriveStats(res.data[0] || {});
     } catch (err) {
       setError(err.response?.data?.detail || "Failed to fetch drive stats");
@@ -47,7 +47,7 @@ export default function Stats() {
 
   const fetchAvailableMonths = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/available-months/`);
+      const res = await axios.get(`${API_BASE_URL}/api/available-months/`, { withCredentials: true });
       setAvailableMonths(res.data);
     } catch (err) {
       console.error("Failed to fetch available months:", err);
@@ -59,6 +59,8 @@ export default function Stats() {
       const params = month ? { month } : {};
       const res = await axios.get(`${API_BASE_URL}/api/monthly-summary/`, {
         params,
+        withCredentials: true,
+
       });
       setMonthlyStats(res.data);
     } catch (err) {
@@ -68,7 +70,7 @@ export default function Stats() {
 
   const fetchMonthlyData = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/monthly-data/`);
+      const res = await axios.get(`${API_BASE_URL}/api/monthly-data/`, { withCredentials: true });
       setMonthlyData(res.data);
     } catch (err) {
       console.error("Failed to fetch monthly data:", err);
