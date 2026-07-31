@@ -1,9 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import axios from "axios";
 
 const API_BASE_URL = "http://localhost:8000";
-
-const cars = [{ id: 1, name: "Ford Focus", mpg_city: 26, mpg_highway: 38 }];
 
 const driveTypes = [
   { id: "required", name: "Required (Work/Errands)" },
@@ -24,9 +22,39 @@ function Calculator() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [cars, setCars] = useState([]);
 
-  const selectedCar =
-    cars.find((car) => car.id.toString() === formData.car_id) || cars[0];
+  const getCars = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/my-cars/`, {
+        credentials: "include",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCars(data);
+      } else {
+        setCars([]);
+      }
+    } catch {
+      setCars([]);
+    }
+  }
+
+  useEffect(() => {
+    getCars();
+  }, []);
+
+  useEffect(() => {
+    if (cars.length === 0) return;
+    const hasValidSelection = cars.some(
+      (car) => car.id.toString() === formData.car_id
+    );
+    if (!hasValidSelection) {
+      setFormData((prev) => ({ ...prev, car_id: cars[0].id.toString() }));
+    }
+  }, [cars]);
+
+  const selectedCar = cars.find((car) => car.id.toString() === formData.car_id);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -35,14 +63,20 @@ function Calculator() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
     setError("");
     setResult(null);
 
+    if (!selectedCar) {
+      setError("Please add a vehicle before calculating a trip.");
+      return;
+    }
+
+    setLoading(true);
+
     const submitData = {
       ...formData,
-      mpg_city: selectedCar.mpg_city,
-      mpg_highway: selectedCar.mpg_highway,
+      mpg_city: selectedCar.city_mpg,
+      mpg_highway: selectedCar.highway_mpg,
     };
 
     try {
@@ -94,14 +128,23 @@ function Calculator() {
               name="car_id"
               value={formData.car_id}
               onChange={handleChange}
+              disabled={cars.length === 0}
               className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
+              {cars.length === 0 && (
+                <option value="">No vehicles added yet</option>
+              )}
               {cars.map((car) => (
                 <option key={car.id} value={car.id}>
-                  {car.name} ({car.mpg_city} city / {car.mpg_highway} hwy)
+                  {car.name} ({car.city_mpg} city / {car.highway_mpg} hwy)
                 </option>
               ))}
             </select>
+            {cars.length === 0 && (
+              <p className="mt-1 text-xs text-gray-500">
+                Add a vehicle on the Manage Account page before calculating a trip.
+              </p>
+            )}
           </div>
 
           {/* Highway Percentage */}
@@ -195,7 +238,7 @@ function Calculator() {
         {/* Submit Button */}
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || cars.length === 0}
           className="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? (
