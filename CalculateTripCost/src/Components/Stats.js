@@ -1,7 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Pie from "./Charts/Pie.js";
 import Bar from "./Charts/Bar.js";
 import axios from "axios";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 
 const API_BASE_URL = "http://localhost:8000";
 
@@ -13,6 +15,12 @@ export default function Stats() {
   const [monthlyData, setMonthlyData] = useState([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [downloadingAll, setDownloadingAll] = useState(false);
+
+  const pieChartRef = useRef(null);
+  const milesChartRef = useRef(null);
+  const costChartRef = useRef(null);
+  const avgCostChartRef = useRef(null);
 
   useEffect(() => {
     fetchDriveStats();
@@ -97,6 +105,91 @@ export default function Stats() {
 
   const currentMonth = availableMonths.length > 0 ? availableMonths[0] : null;
 
+  const handleDownloadAll = async () => {
+    const chartRefs = [
+      pieChartRef,
+      milesChartRef,
+      costChartRef,
+      avgCostChartRef,
+    ].filter((ref) => ref.current);
+
+    if (chartRefs.length === 0) return;
+
+    setDownloadingAll(true);
+    try {
+      const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "letter" });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 40;
+      const titleAreaHeight = 40;
+
+      // --- Page 1: Overall Statistics summary table ---
+      doc.setFontSize(20);
+      doc.setTextColor(31, 41, 55); // gray-800
+      doc.text("Driving Statistics Summary", pageWidth / 2, margin + 10, {
+        align: "center",
+      });
+
+      if (driveStats && driveStats.num_drives > 0) {
+        autoTable(doc, {
+          startY: margin + 30,
+          margin: { left: margin, right: margin },
+          head: [["Metric", "Value"]],
+          body: [
+            ["Total Drives", formatNumber(driveStats.num_drives)],
+            ["Total Cost", formatCurrency(driveStats.sum_costs)],
+            ["Avg Cost / Drive", formatCurrency(driveStats.avg_cost)],
+            ["Total Miles", `${formatNumber(driveStats.total_miles)} miles`],
+            ["Required Drives", formatNumber(driveStats.required_drives_count)],
+            [
+              "Recreational Drives",
+              formatNumber(
+                driveStats.num_drives - driveStats.required_drives_count
+              ),
+            ],
+            ["Required Drive Cost", formatCurrency(driveStats.required_drives_cost)],
+            [
+              "Recreational Drive Cost",
+              formatCurrency(driveStats.recreational_drives_cost),
+            ],
+          ],
+          theme: "grid",
+          headStyles: { fillColor: [59, 130, 246] }, // blue-500
+          styles: { fontSize: 11, cellPadding: 8 },
+        });
+      }
+
+      // --- Following pages: one chart per page ---
+      chartRefs.forEach((ref) => {
+        const image = ref.current.getImage();
+        if (!image) return;
+
+        doc.addPage();
+
+        const { dataUrl, width, height } = image;
+        const maxWidth = pageWidth - margin * 2;
+        const maxHeight = pageHeight - margin * 2 - titleAreaHeight;
+        const scale = Math.min(maxWidth / width, maxHeight / height);
+        const drawWidth = width * scale;
+        const drawHeight = height * scale;
+        const x = (pageWidth - drawWidth) / 2;
+        const y = margin + titleAreaHeight;
+
+        doc.setFontSize(16);
+        doc.setTextColor(31, 41, 55); // gray-800
+        doc.text(ref.current.title || "Chart", pageWidth / 2, margin + 16, {
+          align: "center",
+        });
+
+        doc.addImage(dataUrl, "PNG", x, y, drawWidth, drawHeight);
+      });
+
+      doc.save("driving-report.pdf");
+    } finally {
+      setDownloadingAll(false);
+    }
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       {error && (
@@ -107,17 +200,41 @@ export default function Stats() {
 
       <div className="mb-6 flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900">Driving Statistics</h1>
-        <button
-          onClick={() => {
-            fetchDriveStats();
-            fetchAvailableMonths();
-            fetchMonthlyData();
-          }}
-          disabled={loading}
-          className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded disabled:opacity-50 transition-colors"
-        >
-          {loading ? "Refreshing..." : "Refresh Data"}
-        </button>
+        <div className="flex items-center gap-3">
+          {driveStats && driveStats.num_drives > 0 && (
+            <button
+              onClick={handleDownloadAll}
+              disabled={downloadingAll}
+              className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 py-2 px-4 rounded disabled:opacity-50 transition-colors flex items-center gap-2"
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                />
+              </svg>
+              {downloadingAll ? "Building PDF..." : "Download Report"}
+            </button>
+          )}
+          <button
+            onClick={() => {
+              fetchDriveStats();
+              fetchAvailableMonths();
+              fetchMonthlyData();
+            }}
+            disabled={loading}
+            className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded disabled:opacity-50 transition-colors"
+          >
+            {loading ? "Refreshing..." : "Refresh Data"}
+          </button>
+        </div>
       </div>
 
       {driveStats && driveStats.num_drives !== undefined && driveStats.num_drives === 0 && (
@@ -330,6 +447,7 @@ export default function Stats() {
         driveStats.num_drives > 0 && (
           <div className="mb-8">
             <Pie
+              ref={pieChartRef}
               title="Drive Type Distribution"
               data={{
                 labels: ["Required", "Recreational"],
@@ -360,6 +478,7 @@ export default function Stats() {
           {/* Miles Per Month Chart */}
           {monthlyData.length > 0 ? (
             <Bar
+              ref={milesChartRef}
               title="Miles Per Month"
               data={{
                 labels: monthlyData.map((item) => formatMonthShort(item.month)),
@@ -384,6 +503,7 @@ export default function Stats() {
           {/* Total Cost Per Month Chart */}
           {monthlyData.length > 0 ? (
             <Bar
+              ref={costChartRef}
               title="Total Cost Per Month"
               data={{
                 labels: monthlyData.map((item) => formatMonthShort(item.month)),
@@ -408,6 +528,7 @@ export default function Stats() {
           {/* Average Cost Per Month Chart */}
           {monthlyData.length > 0 ? (
             <Bar
+              ref={avgCostChartRef}
               title="Average Cost Per Month"
               data={{
                 labels: monthlyData.map((item) => formatMonthShort(item.month)),
