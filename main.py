@@ -9,6 +9,7 @@ import requests
 import asyncpg
 import os
 import secrets
+import hashlib
 
 load_dotenv()
 
@@ -160,14 +161,18 @@ async def startup_event():
 # Auth helpers
 # ---------------------------------------------------------------------------
 
+def hash_token(token: str) -> str:
+  return hashlib.sha256(token.encode()).hexdigest()
+
 async def create_session(user_id: int, connection) -> tuple[str, datetime]:
     token = secrets.token_urlsafe(32)
+    token_hash = hash_token(token)
     now = datetime.utcnow()
     expires_at = now + SESSION_DURATION
 
     await connection.execute(
         "INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES ($1, $2, $3, $4)",
-        token, user_id, now, expires_at
+        token_hash, user_id, now, expires_at
     )
     return token, expires_at
 
@@ -176,6 +181,8 @@ async def get_current_user(request: Request) -> dict:
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
+    token_hash = hash_token(token)
+
     pool = await get_db_connection()
     async with pool.acquire() as connection:
         row = await connection.fetchrow("""
@@ -183,7 +190,7 @@ async def get_current_user(request: Request) -> dict:
             FROM sessions s
             JOIN users u ON u.id = s.user_id
             WHERE s.token = $1
-        """, token)
+        """, token_hash)
 
         if not row:
             raise HTTPException(status_code=401, detail="Invalid session")
@@ -207,6 +214,9 @@ async def register(user_data: UserRegister, response: Response):
         )
         if existing:
             raise HTTPException(status_code=400, detail="Email already registered")
+
+        if len(user_data.password) < 8:
+          raise HTTPException(status_code=400, detail="Password too short")
 
         password_hash = pwd_context.hash(user_data.password)
 
@@ -256,9 +266,10 @@ async def login(user_data: UserLogin, response: Response):
 async def logout(request: Request, response: Response):
     token = request.cookies.get(SESSION_COOKIE_NAME)
     if token:
+        token_hash = hash_token(token)
         pool = await get_db_connection()
         async with pool.acquire() as connection:
-            await connection.execute("DELETE FROM sessions WHERE token = $1", token)
+            await connection.execute("DELETE FROM sessions WHERE token = $1", token_hash)
 
     response.delete_cookie(SESSION_COOKIE_NAME)
     return {"message": "Logged out"}
@@ -278,7 +289,7 @@ async def get_my_cars(current_user: dict = Depends(get_current_user)):
             )
             return [dict(row) for row in rows]
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to fetch cars: {str(e)}")
+            raise HTTPException(status_code=500, detail="An internal server error occurred")
 
 @app.post("/api/add-car/")
 async def add_car(car_data: CarData, current_user: dict = Depends(get_current_user)):
@@ -295,7 +306,7 @@ async def add_car(car_data: CarData, current_user: dict = Depends(get_current_us
             )
             return dict(new_car)
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to add car: {str(e)}")
+            raise HTTPException(status_code=500, detail="An internal server error occurred")
 
 @app.put("/api/modify-car/{car_id}")
 async def modify_car(car_id: int, car_data: CarData, current_user: dict = Depends(get_current_user)):
@@ -323,7 +334,7 @@ async def modify_car(car_id: int, car_data: CarData, current_user: dict = Depend
         except HTTPException:
             raise
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to update car: {str(e)}")
+            raise HTTPException(status_code=500, detail="An internal server error occurred")
 
 @app.put("/api/remove-car/{car_id}")
 async def remove_car(car_id: int, current_user: dict = Depends(get_current_user)):
@@ -345,7 +356,7 @@ async def remove_car(car_id: int, current_user: dict = Depends(get_current_user)
         except HTTPException:
             raise
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to delete car: {str(e)}")
+            raise HTTPException(status_code=500, detail="An internal server error occurred")
 
 @app.post("/api/update-password/")
 async def update_password(password_data: PasswordUpdate, current_user: dict = Depends(get_current_user)):
@@ -366,11 +377,16 @@ async def update_password(password_data: PasswordUpdate, current_user: dict = De
                 "UPDATE users SET password_hash = $1 WHERE id = $2",
                 new_hash, current_user["id"]
             )
+
+            await connection.execute(
+              "DELETE FROM sessions WHERE user_id = $1",
+              current_user["id"]
+            )
             return {"message": "Password updated successfully"}
         except HTTPException:
             raise
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to update password: {str(e)}")
+            raise HTTPException(status_code=500, detail="An internal server error occurred")
 
 # ---------------------------------------------------------------------------
 # Gas price / calculation logic (unchanged)
@@ -437,7 +453,7 @@ async def get_gas_prices(state_code: str, connection) -> float:
         return current_price
 
     except requests.exceptions.RequestException as e:
-        raise HTTPException(status_code=502, detail=f"Failed to fetch data from EIA API: {str(e)}")
+        raise HTTPException(status_code=502, detail=f"Failed to fetch data from EIA API")
 
 def calculate_trip_cost(trip_data: TripData, gas_price: float):
     city_ratio = (100 - trip_data.highway_percent)/100
@@ -489,7 +505,7 @@ async def calculate_drive_cost(trip_data: TripData, current_user: dict = Depends
         except HTTPException as he:
             raise he
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"An internal server error occurred: {str(e)}")
+            raise HTTPException(status_code=500, detail="An internal server error occurred")
 
 @app.get("/api/history/")
 async def get_calculation_history(current_user: dict = Depends(get_current_user)):
@@ -502,7 +518,7 @@ async def get_calculation_history(current_user: dict = Depends(get_current_user)
             )
             return [dict(row) for row in rows]
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to fetch history: {str(e)}")
+            raise HTTPException(status_code=500, detail="An internal server error occurred")
 
 @app.get("/api/stats/")
 async def get_drive_stats(current_user: dict = Depends(get_current_user)):
@@ -525,7 +541,7 @@ async def get_drive_stats(current_user: dict = Depends(get_current_user)):
             """, current_user["id"])
             return [dict(stats)] if stats else []
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to fetch stats: {str(e)}")
+            raise HTTPException(status_code=500, detail="An internal server error occurred")
 
 @app.get("/api/available-months/")
 async def get_available_months(current_user: dict = Depends(get_current_user)):
@@ -540,7 +556,7 @@ async def get_available_months(current_user: dict = Depends(get_current_user)):
             """, current_user["id"])
             return [row['month'].isoformat() for row in months]
         except Exception as e:
-            raise HTTPException(500, f"Failed to fetch available months: {str(e)}")
+            raise HTTPException(500, "An internal server error occurred")
 
 @app.get("/api/monthly-summary/")
 async def get_monthly_summary(month: Optional[str] = None, current_user: dict = Depends(get_current_user)):
@@ -588,7 +604,7 @@ async def get_monthly_summary(month: Optional[str] = None, current_user: dict = 
             return [dict(row) for row in results]
 
         except Exception as e:
-            raise HTTPException(500, f"Failed to fetch monthly summary: {str(e)}")
+            raise HTTPException(500, "An internal server error occurred")
 
 @app.get("/api/stats-range/")
 async def get_stats_range(
@@ -629,7 +645,7 @@ async def get_stats_range(
         except HTTPException:
             raise
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to fetch stats for range: {str(e)}")
+            raise HTTPException(status_code=500, detail="An internal server error occurred")
 
 @app.get("/api/monthly-data/")
 async def get_monthly_data(current_user: dict = Depends(get_current_user)):
@@ -655,7 +671,7 @@ async def get_monthly_data(current_user: dict = Depends(get_current_user)):
             return [dict(result) for result in results]
 
     except Exception as e:
-        raise HTTPException(500, f"Failed to fetch monthly summary: {str(e)}")
+        raise HTTPException(500, "An internal server error occurred")
 
 @app.put("/api/update-entry/{entry_id}")
 async def update_entry(entry_id: int, trip_data: TripData, current_user: dict = Depends(get_current_user)):
@@ -718,7 +734,7 @@ async def update_entry(entry_id: int, trip_data: TripData, current_user: dict = 
         except HTTPException:
             raise
         except Exception as e:
-            raise HTTPException(500, f"Failed to update entry: {str(e)}")
+            raise HTTPException(500, "An internal server error occurred")
 
 @app.put("/api/delete-entry/{entry_id}")
 async def delete_entry(entry_id: int, current_user: dict = Depends(get_current_user)):
@@ -743,7 +759,7 @@ async def delete_entry(entry_id: int, current_user: dict = Depends(get_current_u
         except HTTPException:
             raise
         except Exception as e:
-            raise HTTPException(500, f"Failed to delete entry: {str(e)}")
+            raise HTTPException(500, "An internal server error occurred")
 
 @app.get("/api/health/")
 async def health_check():
@@ -753,7 +769,7 @@ async def health_check():
             await connection.fetchval("SELECT 1")
             return {"status": "healthy", "database": "connected"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database connection failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="An internal server error occurred")
 
 if __name__ == "__main__":
     import uvicorn
