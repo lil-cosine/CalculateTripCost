@@ -6,6 +6,7 @@ A full-stack web application for tracking and analyzing driving expenses. Calcul
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.104-green)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17.0-blue)
 ![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3.0-38B2AC)
+[![codecov](https://codecov.io/gh/lil-cosine/CalculateTripCost/branch/main/graph/badge.svg)](https://codecov.io/gh/lil-cosine/CalculateTripCost)
 
 ## Features
 
