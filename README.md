@@ -61,10 +61,12 @@ GRANT ALL PRIVILEGES ON DATABASE drive_cost_db TO drive_cost_user;
 ```
 
 5. **Enviroment Configuration**:
-Modify the ```.env``` file in the project root directory:
+Create the file ```.env``` in the project root directory:
 ```env
 DATABASE_URL=postgresql://drive_cost_user:your_password@localhost/drive_cost_db
 EIA_API_KEY=your_eia_api_key_here
+ALLOWED_ORIGINS=your_allowed_origins
+POSTGRES_PASSWORD=your_password
 ```
 
 6. **Get EIA API Key**:
