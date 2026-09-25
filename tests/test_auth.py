@@ -5,132 +5,258 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import main
+import main  # noqa: E402
 
 
 @pytest.mark.asyncio
-async def test_register_rejects_short_password(client, fake_connection):
-    fake_connection.fetchrow.return_value = None  # no existing user
+async def test_register_rejects_short_password(
+    client,
+    fake_connection,
+):
+    fake_connection.fetchrow.return_value = None
 
     async with client as ac:
         resp = await ac.post(
             "/api/register/",
-            json={"email": "new@example.com", "password": "short"},
+            json={
+                "email": "new@example.com",
+                "password": "short",
+            },
         )
+
     assert resp.status_code == 400
     assert resp.json()["detail"] == "Password too short"
 
 
 @pytest.mark.asyncio
-async def test_register_rejects_duplicate_email(client, fake_connection):
-    fake_connection.fetchrow.return_value = {"id": 1}  # existing user found
+async def test_register_rejects_duplicate_email(
+    client,
+    fake_connection,
+):
+    fake_connection.fetchrow.return_value = {
+        "id": 1
+    }
 
     async with client as ac:
         resp = await ac.post(
             "/api/register/",
-            json={"email": "existing@example.com", "password": "longenough123"},
+            json={
+                "email": "existing@example.com",
+                "password": "longenough123",
+            },
         )
+
     assert resp.status_code == 400
     assert resp.json()["detail"] == "Email already registered"
 
 
 @pytest.mark.asyncio
-async def test_register_success_sets_session_cookie(client, fake_connection):
-    # 1st fetchrow: no existing user. 2nd fetchrow: the INSERT ... RETURNING.
+async def test_register_success_sets_session_cookie(
+    client,
+    fake_connection,
+):
+    # First fetchrow:
+    #   Check whether email already exists.
+    #
+    # Second fetchrow:
+    #   INSERT ... RETURNING
     fake_connection.fetchrow.side_effect = [
         None,
-        {"id": 1, "email": "new@example.com"},
+        {
+            "id": 1,
+            "email": "new@example.com",
+        },
     ]
 
     async with client as ac:
         resp = await ac.post(
             "/api/register/",
-            json={"email": "new@example.com", "password": "longenough123"},
+            json={
+                "email": "new@example.com",
+                "password": "longenough123",
+            },
         )
+
     assert resp.status_code == 200
-    assert resp.json() == {"id": 1, "email": "new@example.com"}
+
+    assert resp.json() == {
+        "id": 1,
+        "email": "new@example.com",
+    }
+
     assert "session_token" in resp.cookies
 
 
 @pytest.mark.asyncio
-async def test_login_rejects_wrong_password(client, fake_connection):
+async def test_login_rejects_wrong_password(
+    client,
+    fake_connection,
+):
     from main import pwd_context
 
     fake_connection.fetchrow.return_value = {
         "id": 1,
         "email": "user@example.com",
-        "password_hash": pwd_context.hash("correct-password"),
+        "password_hash": pwd_context.hash(
+            "correct-password"
+        ),
     }
 
     async with client as ac:
         resp = await ac.post(
             "/api/login/",
-            json={"email": "user@example.com", "password": "wrong-password"},
+            json={
+                "email": "user@example.com",
+                "password": "wrong-password",
+            },
         )
+
     assert resp.status_code == 401
 
 
 @pytest.mark.asyncio
-async def test_login_rejects_unknown_email(client, fake_connection):
+async def test_login_rejects_unknown_email(
+    client,
+    fake_connection,
+):
     fake_connection.fetchrow.return_value = None
 
     async with client as ac:
         resp = await ac.post(
             "/api/login/",
-            json={"email": "nobody@example.com", "password": "whatever123"},
+            json={
+                "email": "nobody@example.com",
+                "password": "whatever123",
+            },
         )
+
     assert resp.status_code == 401
 
 
 @pytest.mark.asyncio
-async def test_login_success_sets_session_cookie(client, fake_connection):
+async def test_login_success_sets_session_cookie(
+    client,
+    fake_connection,
+):
     from main import pwd_context
 
     fake_connection.fetchrow.return_value = {
         "id": 1,
         "email": "user@example.com",
-        "password_hash": pwd_context.hash("correct-password"),
+        "password_hash": pwd_context.hash(
+            "correct-password"
+        ),
     }
 
     async with client as ac:
         resp = await ac.post(
             "/api/login/",
-            json={"email": "user@example.com", "password": "correct-password"},
+            json={
+                "email": "user@example.com",
+                "password": "correct-password",
+            },
         )
+
     assert resp.status_code == 200
     assert "session_token" in resp.cookies
+
+
+@pytest.mark.asyncio
+async def test_login_rate_limit_returns_429(
+    client,
+    fake_connection,
+    fake_redis,
+):
+    fake_redis.incr.return_value = 6
+    fake_redis.ttl.return_value = 42
+
+    async with client as ac:
+        resp = await ac.post(
+            "/api/login/",
+            json={
+                "email": "user@example.com",
+                "password": "whatever123",
+            },
+        )
+
+    assert resp.status_code == 429
+
+    assert resp.json()["detail"] == (
+        "Too many requests. Try again in 42 seconds."
+    )
+
+    # The rate limit should stop the request before
+    # checking the database or password.
+    fake_connection.fetchrow.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_register_rate_limit_returns_429(
+    client,
+    fake_connection,
+    fake_redis,
+):
+    fake_redis.incr.return_value = 6
+    fake_redis.ttl.return_value = 37
+
+    async with client as ac:
+        resp = await ac.post(
+            "/api/register/",
+            json={
+                "email": "new@example.com",
+                "password": "longenough123",
+            },
+        )
+
+    assert resp.status_code == 429
+
+    assert resp.json()["detail"] == (
+        "Too many requests. Try again in 37 seconds."
+    )
+
+    # The rate limit should happen before the DB lookup.
+    fake_connection.fetchrow.assert_not_awaited()
 
 
 @pytest.mark.asyncio
 async def test_me_requires_authentication(client):
     async with client as ac:
         resp = await ac.get("/api/me/")
+
     assert resp.status_code == 401
 
 
 @pytest.mark.asyncio
-async def test_modify_car_returns_404_for_another_users_car(client, fake_connection):
-    # Simulate: valid session, but the car lookup scoped to user_id finds nothing
-    # because it belongs to a different user.
-    import hashlib
-    from datetime import datetime, timedelta
+async def test_modify_car_returns_404_for_another_users_car(
+    client,
+    fake_connection,
+    fake_redis,
+):
+    # Redis session lookup should return user ID 1.
+    fake_redis.get.return_value = "1"
 
-    token = "sometoken"
-    token_hash = hashlib.sha256(token.encode()).hexdigest()
-
-    fake_connection.fetchrow.side_effect = [
-        {  # session lookup in get_current_user
-            "id": 1,
-            "email": "user@example.com",
-            "expires_at": datetime.utcnow() + timedelta(days=1),
-        },
-        None,  # car ownership check finds nothing
-    ]
+    # The first database call is now the car ownership check.
+    # Since the car belongs to another user (or doesn't exist),
+    # it should return None.
+    fake_connection.fetchrow.return_value = None
 
     async with client as ac:
-        ac.cookies.set("session_token", token)
+        ac.cookies.set(
+            "session_token",
+            "sometoken",
+        )
+
         resp = await ac.put(
             "/api/modify-car/999",
-            json={"name": "Civic", "highway_mpg": 38, "city_mpg": 30},
+            json={
+                "name": "Civic",
+                "highway_mpg": 38,
+                "city_mpg": 30,
+            },
         )
+
     assert resp.status_code == 404
+    assert resp.json()["detail"] == "Car not found"
+
+    # Verify authentication actually used Redis.
+    fake_redis.get.assert_awaited_once()
