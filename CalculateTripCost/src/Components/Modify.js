@@ -83,7 +83,7 @@ export default function Modify() {
       } else if (typeof a[key] === "string") {
         comparison = a[key].localeCompare(b[key]);
       } else {
-        comparison = a[key] - b[key];
+        comparison = Number(a[key]) - Number(b[key]);
       }
 
       return direction === "ascending"
@@ -211,6 +211,12 @@ export default function Modify() {
   const formatNumber = (num) =>
     parseFloat(num).toFixed(1);
 
+  const formatCurrency = (amount) =>
+    Number(amount).toLocaleString("en-US", {
+      style: "currency",
+      currency: "USD",
+    });
+
   const columns = [
     {
       key: "start_time",
@@ -222,6 +228,12 @@ export default function Modify() {
       key: "miles",
       label: "Miles",
       width: "w-20",
+      sortable: true,
+    },
+    {
+      key: "total_cost",
+      label: "Cost",
+      width: "w-24",
       sortable: true,
     },
     {
@@ -427,6 +439,13 @@ export default function Modify() {
                           {formatNumber(trip.miles)}
                         </span>
                       )}
+                    </td>
+
+                    {/* Total Cost - Read Only */}
+                    <td className="px-4 py-3">
+                      <span className="text-sm text-gray-900 text-right block font-medium">
+                        {formatCurrency(trip.total_cost)}
+                      </span>
                     </td>
 
                     {/* City MPG */}
