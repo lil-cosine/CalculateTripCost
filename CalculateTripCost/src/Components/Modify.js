@@ -13,6 +13,11 @@ export default function Modify() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  const [sortConfig, setSortConfig] = useState({
+    key: "start_time",
+    direction: "descending",
+  });
+
   const itemsPerPage = 15;
 
   useEffect(() => {
@@ -21,12 +26,22 @@ export default function Modify() {
 
   const fetchAllDrives = async () => {
     setLoading(true);
+
     try {
-    const res = await axios.get(`${API_BASE_URL}/api/history/`, { withCredentials: true });
+      const res = await axios.get(`${API_BASE_URL}/api/history/`, {
+        withCredentials: true,
+      });
+
       setAllDrives(res.data);
       setError("");
+
+      // Sort the freshly fetched data instead of relying on
+      // allDrives, which has not updated yet.
+      sortTable("start_time", res.data, true);
     } catch (err) {
-      setError(err.response?.data?.detail || "Failed to fetch drive history");
+      setError(
+        err.response?.data?.detail || "Failed to fetch drive history"
+      );
     } finally {
       setLoading(false);
     }
@@ -42,24 +57,71 @@ export default function Modify() {
     setEditData({});
   };
 
+  const sortTable = (key, data = allDrives, initial = false) => {
+    let direction;
+
+    if (initial) {
+      direction = "descending";
+    } else if (sortConfig.key === key) {
+      direction =
+        sortConfig.direction === "ascending"
+          ? "descending"
+          : "ascending";
+    } else {
+      direction = "descending";
+    }
+
+    const clonedTable = [...data];
+
+    clonedTable.sort((a, b) => {
+      let comparison = 0;
+
+      if (key === "start_time") {
+        comparison =
+          new Date(a[key]).getTime() -
+          new Date(b[key]).getTime();
+      } else if (typeof a[key] === "string") {
+        comparison = a[key].localeCompare(b[key]);
+      } else {
+        comparison = a[key] - b[key];
+      }
+
+      return direction === "ascending"
+        ? comparison
+        : -comparison;
+    });
+
+    setSortConfig({
+      key,
+      direction,
+    });
+
+    setAllDrives(clonedTable);
+  };
+
   const handleSave = async (id) => {
     setSaving(true);
+
     try {
       const response = await axios.put(
         `${API_BASE_URL}/api/update-entry/${id}`,
         editData,
-        { withCredentials: true },
+        { withCredentials: true }
       );
 
       setAllDrives((prev) =>
-        prev.map((item) => (item.id === id ? response.data : item)),
+        prev.map((item) =>
+          item.id === id ? response.data : item
+        )
       );
 
       setEditingId(null);
       setEditData({});
       setError("");
     } catch (err) {
-      setError(err.response?.data?.detail || "Failed to update entry");
+      setError(
+        err.response?.data?.detail || "Failed to update entry"
+      );
     } finally {
       setSaving(false);
     }
@@ -71,13 +133,23 @@ export default function Modify() {
     }
 
     setDeleting(id);
-    try {
-      await axios.put(`${API_BASE_URL}/api/delete-entry/${id}`, {}, { withCredentials: true });
 
-      setAllDrives((prev) => prev.filter((item) => item.id !== id));
+    try {
+      await axios.put(
+        `${API_BASE_URL}/api/delete-entry/${id}`,
+        {},
+        { withCredentials: true }
+      );
+
+      setAllDrives((prev) =>
+        prev.filter((item) => item.id !== id)
+      );
+
       setError("");
     } catch (err) {
-      setError(err.response?.data?.detail || "Failed to delete entry");
+      setError(
+        err.response?.data?.detail || "Failed to delete entry"
+      );
     } finally {
       setDeleting(false);
     }
@@ -90,9 +162,17 @@ export default function Modify() {
     }));
   };
 
-  const totalPages = Math.max(Math.ceil(allDrives.length / itemsPerPage), 1);
+  const totalPages = Math.max(
+    Math.ceil(allDrives.length / itemsPerPage),
+    1
+  );
+
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const currentDrives = allDrives.slice(startIndex, startIndex + itemsPerPage);
+
+  const currentDrives = allDrives.slice(
+    startIndex,
+    startIndex + itemsPerPage
+  );
 
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= totalPages) {
@@ -102,20 +182,91 @@ export default function Modify() {
 
   const formatDateTime = (dateString) => {
     const date = new Date(dateString);
+
     let hours = date.getHours();
-    const minutes = date.getMinutes().toString().padStart(2, "0");
+    const minutes = date
+      .getMinutes()
+      .toString()
+      .padStart(2, "0");
+
     const ampm = hours >= 12 ? "pm" : "am";
+
     hours = hours % 12;
     hours = hours ? hours : 12;
+
     const time = `${hours}:${minutes} ${ampm}`;
+
     const month = (date.getMonth() + 1).toString();
     const day = date.getDate().toString();
-    const year = date.getFullYear().toString().slice(-2);
+    const year = date
+      .getFullYear()
+      .toString()
+      .slice(-2);
+
     const dateFormatted = `${month}/${day}/${year}`;
+
     return `${dateFormatted} at ${time}`;
   };
 
-  const formatNumber = (num) => parseFloat(num).toFixed(1);
+  const formatNumber = (num) =>
+    parseFloat(num).toFixed(1);
+
+  const columns = [
+    {
+      key: "start_time",
+      label: "Date",
+      width: "w-48",
+      sortable: true,
+    },
+    {
+      key: "miles",
+      label: "Miles",
+      width: "w-20",
+      sortable: true,
+    },
+    {
+      key: "mpg_city",
+      label: "City MPG",
+      width: "w-24",
+      sortable: true,
+    },
+    {
+      key: "mpg_highway",
+      label: "Hwy MPG",
+      width: "w-24",
+      sortable: true,
+    },
+    {
+      key: "highway_percent",
+      label: "Hwy %",
+      width: "w-20",
+      sortable: true,
+    },
+    {
+      key: "state_code",
+      label: "State",
+      width: "w-16",
+      sortable: false,
+    },
+    {
+      key: "drive_type",
+      label: "Type",
+      width: "w-28",
+      sortable: false,
+    },
+    {
+      key: "reason",
+      label: "Reason",
+      width: "w-48",
+      sortable: false,
+    },
+    {
+      key: "actions",
+      label: "Actions",
+      width: "w-32",
+      sortable: false,
+    },
+  ];
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -130,10 +281,13 @@ export default function Modify() {
           <h1 className="text-2xl font-bold text-gray-900">
             Previous Drives
           </h1>
+
           <p className="text-gray-600 mt-1">
-            {allDrives.length} total drives • Page {currentPage} of {totalPages}
+            {allDrives.length} total drives • Page{" "}
+            {currentPage} of {totalPages}
           </p>
         </div>
+
         <button
           onClick={fetchAllDrives}
           disabled={loading}
@@ -155,12 +309,14 @@ export default function Modify() {
                   stroke="currentColor"
                   strokeWidth="4"
                 ></circle>
+
                 <path
                   className="opacity-75"
                   fill="currentColor"
                   d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                 ></path>
               </svg>
+
               <span>Loading...</span>
             </>
           ) : (
@@ -178,6 +334,7 @@ export default function Modify() {
                   d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                 />
               </svg>
+
               <span>Refresh Data</span>
             </>
           )}
@@ -190,26 +347,40 @@ export default function Modify() {
             <table className="min-w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  {[
-                    { key: "start_time", label: "Date", width: "w-48" },
-                    { key: "miles", label: "Miles", width: "w-20" },
-                    { key: "mpg_city", label: "City MPG", width: "w-24" },
-                    { key: "mpg_highway", label: "Hwy MPG", width: "w-24" },
-                    { key: "highway_percent", label: "Hwy %", width: "w-20" },
-                    { key: "state_code", label: "State", width: "w-16" },
-                    { key: "drive_type", label: "Type", width: "w-28" },
-                    { key: "reason", label: "Reason", width: "w-48" },
-                    { key: "actions", label: "Actions", width: "w-32" },
-                  ].map(({ key, label, width }) => (
-                    <th
-                      key={key}
-                      className={`px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${width}`}
-                    >
-                      {label}
-                    </th>
-                  ))}
+                  {columns.map(
+                    ({ key, label, width, sortable }) => (
+                      <th
+                        key={key}
+                        onClick={
+                          sortable
+                            ? () => sortTable(key)
+                            : undefined
+                        }
+                        className={`px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${width} ${
+                          sortable
+                            ? "cursor-pointer hover:bg-gray-100 select-none"
+                            : ""
+                        }`}
+                      >
+                        <div className="flex items-center space-x-1">
+                          <span>{label}</span>
+
+                          {sortable &&
+                            sortConfig.key === key && (
+                              <span className="text-gray-700">
+                                {sortConfig.direction ===
+                                "ascending"
+                                  ? "↑"
+                                  : "↓"}
+                              </span>
+                            )}
+                        </div>
+                      </th>
+                    )
+                  )}
                 </tr>
               </thead>
+
               <tbody className="divide-y divide-gray-200">
                 {currentDrives.map((trip) => (
                   <tr
@@ -220,15 +391,24 @@ export default function Modify() {
                     <td className="px-4 py-3 text-sm text-gray-900">
                       <div className="flex flex-col">
                         <span className="font-medium text-gray-900">
-                          {formatDateTime(trip.start_time).split(" at ")[0]}
+                          {
+                            formatDateTime(
+                              trip.start_time
+                            ).split(" at ")[0]
+                          }
                         </span>
+
                         <span className="text-gray-500 text-xs">
-                          {formatDateTime(trip.start_time).split(" at ")[1]}
+                          {
+                            formatDateTime(
+                              trip.start_time
+                            ).split(" at ")[1]
+                          }
                         </span>
                       </div>
                     </td>
 
-                    {/* Editable Fields */}
+                    {/* Miles */}
                     <td className="px-4 py-3">
                       {editingId === trip.id ? (
                         <input
@@ -237,7 +417,7 @@ export default function Modify() {
                           onChange={(e) =>
                             handleInputChange(
                               "miles",
-                              parseFloat(e.target.value),
+                              parseFloat(e.target.value)
                             )
                           }
                           className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
@@ -249,6 +429,7 @@ export default function Modify() {
                       )}
                     </td>
 
+                    {/* City MPG */}
                     <td className="px-4 py-3">
                       {editingId === trip.id ? (
                         <input
@@ -257,7 +438,7 @@ export default function Modify() {
                           onChange={(e) =>
                             handleInputChange(
                               "mpg_city",
-                              parseInt(e.target.value),
+                              parseInt(e.target.value)
                             )
                           }
                           className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
@@ -269,6 +450,7 @@ export default function Modify() {
                       )}
                     </td>
 
+                    {/* Highway MPG */}
                     <td className="px-4 py-3">
                       {editingId === trip.id ? (
                         <input
@@ -277,7 +459,7 @@ export default function Modify() {
                           onChange={(e) =>
                             handleInputChange(
                               "mpg_highway",
-                              parseInt(e.target.value),
+                              parseInt(e.target.value)
                             )
                           }
                           className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
@@ -289,15 +471,18 @@ export default function Modify() {
                       )}
                     </td>
 
+                    {/* Highway Percentage */}
                     <td className="px-4 py-3">
                       {editingId === trip.id ? (
                         <input
                           type="number"
-                          value={editData.highway_percent || ""}
+                          value={
+                            editData.highway_percent || ""
+                          }
                           onChange={(e) =>
                             handleInputChange(
                               "highway_percent",
-                              parseInt(e.target.value),
+                              parseInt(e.target.value)
                             )
                           }
                           className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
@@ -311,15 +496,18 @@ export default function Modify() {
                       )}
                     </td>
 
+                    {/* State */}
                     <td className="px-4 py-3">
                       {editingId === trip.id ? (
                         <input
                           type="text"
-                          value={editData.state_code || ""}
+                          value={
+                            editData.state_code || ""
+                          }
                           onChange={(e) =>
                             handleInputChange(
                               "state_code",
-                              e.target.value.toUpperCase(),
+                              e.target.value.toUpperCase()
                             )
                           }
                           className="w-full px-2 py-1 border border-gray-300 rounded text-sm uppercase"
@@ -332,17 +520,28 @@ export default function Modify() {
                       )}
                     </td>
 
+                    {/* Drive Type */}
                     <td className="px-4 py-3">
                       {editingId === trip.id ? (
                         <select
-                          value={editData.drive_type || "required"}
+                          value={
+                            editData.drive_type ||
+                            "required"
+                          }
                           onChange={(e) =>
-                            handleInputChange("drive_type", e.target.value)
+                            handleInputChange(
+                              "drive_type",
+                              e.target.value
+                            )
                           }
                           className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                         >
-                          <option value="required">Required</option>
-                          <option value="recreational">Recreational</option>
+                          <option value="required">
+                            Required
+                          </option>
+                          <option value="recreational">
+                            Recreational
+                          </option>
                         </select>
                       ) : (
                         <span className="text-sm text-gray-900 text-right block capitalize">
@@ -351,13 +550,17 @@ export default function Modify() {
                       )}
                     </td>
 
+                    {/* Reason */}
                     <td className="px-4 py-3">
                       {editingId === trip.id ? (
                         <input
                           type="text"
                           value={editData.reason || ""}
                           onChange={(e) =>
-                            handleInputChange("reason", e.target.value)
+                            handleInputChange(
+                              "reason",
+                              e.target.value
+                            )
                           }
                           className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                         />
@@ -371,17 +574,22 @@ export default function Modify() {
                       )}
                     </td>
 
-                    {/* Actions Column */}
+                    {/* Actions */}
                     <td className="px-4 py-3">
                       {editingId === trip.id ? (
                         <div className="flex space-x-2">
                           <button
-                            onClick={() => handleSave(trip.id)}
+                            onClick={() =>
+                              handleSave(trip.id)
+                            }
                             disabled={saving}
                             className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm disabled:opacity-50"
                           >
-                            {saving ? "Saving..." : "Save"}
+                            {saving
+                              ? "Saving..."
+                              : "Save"}
                           </button>
+
                           <button
                             onClick={handleCancelEdit}
                             className="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm"
@@ -392,17 +600,26 @@ export default function Modify() {
                       ) : (
                         <div className="flex space-x-2">
                           <button
-                            onClick={() => handleEdit(trip)}
+                            onClick={() =>
+                              handleEdit(trip)
+                            }
                             className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm"
                           >
                             Edit
                           </button>
+
                           <button
-                            onClick={() => handleDelete(trip.id)}
-                            disabled={deleting === trip.id}
+                            onClick={() =>
+                              handleDelete(trip.id)
+                            }
+                            disabled={
+                              deleting === trip.id
+                            }
                             className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm disabled:opacity-50"
                           >
-                            {deleting === trip.id ? "Deleting..." : "Delete"}
+                            {deleting === trip.id
+                              ? "Deleting..."
+                              : "Delete"}
                           </button>
                         </div>
                       )}
@@ -418,12 +635,21 @@ export default function Modify() {
             <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
               <div className="flex-1 flex justify-between items-center">
                 <div className="text-sm text-gray-700">
-                  Showing <span className="font-medium">{startIndex + 1}</span>{" "}
+                  Showing{" "}
+                  <span className="font-medium">
+                    {startIndex + 1}
+                  </span>{" "}
                   to{" "}
                   <span className="font-medium">
-                    {Math.min(startIndex + itemsPerPage, allDrives.length)}
+                    {Math.min(
+                      startIndex + itemsPerPage,
+                      allDrives.length
+                    )}
                   </span>{" "}
-                  of <span className="font-medium">{allDrives.length}</span>{" "}
+                  of{" "}
+                  <span className="font-medium">
+                    {allDrives.length}
+                  </span>{" "}
                   drives
                 </div>
 
@@ -437,59 +663,97 @@ export default function Modify() {
                       disabled={currentPage === 1}
                       className="relative inline-flex items-center px-3 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <span className="sr-only">First</span>
+                      <span className="sr-only">
+                        First
+                      </span>
                       &laquo;
                     </button>
+
                     <button
-                      onClick={() => handlePageChange(currentPage - 1)}
+                      onClick={() =>
+                        handlePageChange(currentPage - 1)
+                      }
                       disabled={currentPage === 1}
                       className="relative inline-flex items-center px-3 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <span className="sr-only">Previous</span>
+                      <span className="sr-only">
+                        Previous
+                      </span>
                       &lsaquo;
                     </button>
 
-                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                      let pageNum;
-                      if (currentPage <= 3) {
-                        pageNum = i + 1;
-                      } else if (currentPage >= totalPages - 2) {
-                        pageNum = totalPages - 4 + i;
-                      } else {
-                        pageNum = currentPage - 2 + i;
+                    {Array.from(
+                      {
+                        length: Math.min(5, totalPages),
+                      },
+                      (_, i) => {
+                        let pageNum;
+
+                        if (currentPage <= 3) {
+                          pageNum = i + 1;
+                        } else if (
+                          currentPage >=
+                          totalPages - 2
+                        ) {
+                          pageNum =
+                            totalPages - 4 + i;
+                        } else {
+                          pageNum =
+                            currentPage - 2 + i;
+                        }
+
+                        if (
+                          pageNum > totalPages ||
+                          pageNum < 1
+                        ) {
+                          return null;
+                        }
+
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() =>
+                              handlePageChange(pageNum)
+                            }
+                            className={`relative inline-flex items-center px-3 py-2 border text-sm font-medium ${
+                              currentPage === pageNum
+                                ? "z-10 bg-blue-50 border-blue-500 text-blue-600"
+                                : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50"
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        );
                       }
-
-                      if (pageNum > totalPages || pageNum < 1) return null;
-
-                      return (
-                        <button
-                          key={pageNum}
-                          onClick={() => handlePageChange(pageNum)}
-                          className={`relative inline-flex items-center px-3 py-2 border text-sm font-medium ${
-                            currentPage === pageNum
-                              ? "z-10 bg-blue-50 border-blue-500 text-blue-600"
-                              : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50"
-                          }`}
-                        >
-                          {pageNum}
-                        </button>
-                      );
-                    })}
+                    )}
 
                     <button
-                      onClick={() => handlePageChange(currentPage + 1)}
-                      disabled={currentPage === totalPages}
+                      onClick={() =>
+                        handlePageChange(currentPage + 1)
+                      }
+                      disabled={
+                        currentPage === totalPages
+                      }
                       className="relative inline-flex items-center px-3 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <span className="sr-only">Next</span>
+                      <span className="sr-only">
+                        Next
+                      </span>
                       &rsaquo;
                     </button>
+
                     <button
-                      onClick={() => handlePageChange(totalPages)}
-                      disabled={currentPage === totalPages}
+                      onClick={() =>
+                        handlePageChange(totalPages)
+                      }
+                      disabled={
+                        currentPage === totalPages
+                      }
                       className="relative inline-flex items-center px-3 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <span className="sr-only">Last</span>
+                      <span className="sr-only">
+                        Last
+                      </span>
                       &raquo;
                     </button>
                   </nav>
