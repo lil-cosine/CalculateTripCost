@@ -109,10 +109,11 @@ function Calculator() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Trip Distance */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="miles" className="block text-sm font-medium text-gray-700 mb-1">
               Trip Distance (miles)
             </label>
             <input
+              id="miles"
               type="number"
               name="miles"
               value={formData.miles}
@@ -127,10 +128,11 @@ function Calculator() {
 
           {/* Car Selection */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="car_id" className="block text-sm font-medium text-gray-700 mb-1">
               Vehicle
             </label>
             <select
+              id="car_id"
               name="car_id"
               value={formData.car_id}
               onChange={handleChange}
@@ -155,10 +157,11 @@ function Calculator() {
 
           {/* Highway Percentage */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="highway_percent" className="block text-sm font-medium text-gray-700 mb-1">
               Highway Driving: {formData.highway_percent}%
             </label>
             <input
+              id="highway_percent"
               type="range"
               name="highway_percent"
               min="0"
@@ -175,10 +178,11 @@ function Calculator() {
 
           {/* State Selection */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="state_code" className="block text-sm font-medium text-gray-700 mb-1">
               State
             </label>
             <select
+              id="state_code"
               name="state_code"
               value={formData.state_code}
               onChange={handleChange}
@@ -194,10 +198,11 @@ function Calculator() {
 
           {/* Drive Type */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="drive_type" className="block text-sm font-medium text-gray-700 mb-1">
               Drive Type
             </label>
             <select
+              id="drive_type"
               name="drive_type"
               value={formData.drive_type}
               onChange={handleChange}
@@ -213,10 +218,11 @@ function Calculator() {
 
           {/* Start Time */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="start_time" className="block text-sm font-medium text-gray-700 mb-1">
               Drive Start Time
             </label>
             <input
+              id="start_time"
               type="datetime-local"
               name="start_time"
               value={formData.start_time}
@@ -228,10 +234,11 @@ function Calculator() {
 
         {/* Reason for Drive */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="reason" className="block text-sm font-medium text-gray-700 mb-1">
             Reason for Drive
           </label>
           <textarea
+            id="reason"
             name="reason"
             value={formData.reason}
             onChange={handleChange}
