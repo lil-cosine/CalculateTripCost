@@ -40,6 +40,14 @@ class FakePool:
         return FakeAcquireContext(self._connection)
 
 
+class FakeRedis:
+    def __init__(self):
+        self.get = AsyncMock(return_value=None)
+        self.set = AsyncMock(return_value=True)
+        self.incr = AsyncMock(return_value=1)
+        self.expire = AsyncMock(return_value=True)
+        self.ttl = AsyncMock(return_value=60)
+
 @pytest.fixture
 def fake_connection():
     """A fresh mocked connection for each test."""
@@ -50,6 +58,9 @@ def fake_connection():
 def fake_pool(fake_connection):
     return FakePool(fake_connection)
 
+@pytest.fixture
+def fake_redis():
+    return FakeRedis()
 
 @pytest.fixture(autouse=True)
 def patch_db(monkeypatch, fake_pool):
@@ -63,6 +74,11 @@ def patch_db(monkeypatch, fake_pool):
     monkeypatch.setattr(main, "_pool", fake_pool)
     return fake_pool
 
+
+@pytest.fixture(autouse=True)
+def patch_redis(monkeypatch, fake_redis):
+    monkeypatch.setattr(main, "redis_client", fake_redis)
+    return fake_redis
 
 @pytest.fixture
 def client():
