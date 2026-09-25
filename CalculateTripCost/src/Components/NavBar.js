@@ -1,11 +1,41 @@
-function NavBar({ activeSection, setActiveSection }) {
+function NavBar({ activeSection, setActiveSection, onLogout }) {
   const navItems = [
-    { id: "stats", label: "Drive Stats", icon: "📊" },
-    { id: "add", label: "Add Drive", icon: "➕" },
-    // { id: "past", label: "Past Drives", icon: "📋" },
-    { id: "mod", label: "Past Drives", icon: "📋" },
-    { id: "usr", label: "Manage Account", icon: "👤" },
-    { id: "lgout", label: "Log Out", icon: "👋"}
+    {
+      id: "stats",
+      label: "Drive Stats",
+      icon: "📊",
+      onClick: () => setActiveSection("stats"),
+    },
+    {
+      id: "add",
+      label: "Add Drive",
+      icon: "➕",
+      onClick: () => setActiveSection("add"),
+    },
+    // {
+    //   id: "past",
+    //   label: "Past Drives",
+    //   icon: "📋",
+    //   onClick: () => setActiveSection("past"),
+    // },
+    {
+      id: "mod",
+      label: "Past Drives",
+      icon: "📋",
+      onClick: () => setActiveSection("mod"),
+    },
+    {
+      id: "usr",
+      label: "Manage Account",
+      icon: "👤",
+      onClick: () => setActiveSection("usr"),
+    },
+    {
+      id: "lgout",
+      label: "Log Out",
+      icon: "👋",
+      onClick: onLogout,
+    },
   ];
 
   return (
@@ -28,7 +58,7 @@ function NavBar({ activeSection, setActiveSection }) {
             {navItems.map((item) => (
               <button
                 key={item.id}
-                onClick={() => setActiveSection(item.id)}
+                onClick={item.onClick}
                 className={`
                   relative flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200
                   ${

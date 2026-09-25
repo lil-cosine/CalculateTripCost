@@ -30,7 +30,13 @@ function App() {
     );
   }
 
-  const renderSection = () => {
+  const handleLogout = async () => {
+      setAuthView("login");
+      setActiveSection("stats");
+      await logout();
+  }
+
+    const renderSection = () => {
     switch (activeSection) {
       case "add":
         return <Calculator />;
@@ -42,10 +48,9 @@ function App() {
         return <Modify />;
       case "usr":
         return <User />;
-      case "lgout":
-        logout();
-        setActiveSection("stats");
-        return;
+      // case "lgout":
+      //   handleLogout();
+      //   return;
       default:
         return <Calculator />;
     }
@@ -56,6 +61,7 @@ function App() {
       <NavBar
         activeSection={activeSection}
         setActiveSection={setActiveSection}
+        onLogout={handleLogout}
       />
       <div>{renderSection()}</div>
     </div>
