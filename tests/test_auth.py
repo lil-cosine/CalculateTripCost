@@ -232,12 +232,19 @@ async def test_modify_car_returns_404_for_another_users_car(
     fake_connection,
     fake_redis,
 ):
-    # Redis session lookup should return user ID 1.
-    fake_redis.get.return_value = "1"
+    # Redis session lookup:
+    #   session:{token_hash} -> user ID 1
+    #
+    # Session version lookups:
+    #   session_version:{token_hash} -> 0
+    #   user_session_version:1 -> 0
+    fake_redis.get.side_effect = [
+        "1",
+        "0",
+        "0",
+    ]
 
-    # The first database call is now the car ownership check.
-    # Since the car belongs to another user (or doesn't exist),
-    # it should return None.
+    # The car does not belong to this user (or does not exist).
     fake_connection.fetchrow.return_value = None
 
     async with client as ac:
@@ -258,5 +265,8 @@ async def test_modify_car_returns_404_for_another_users_car(
     assert resp.status_code == 404
     assert resp.json()["detail"] == "Car not found"
 
-    # Verify authentication actually used Redis.
-    fake_redis.get.assert_awaited_once()
+    # Authentication now requires three Redis lookups:
+    # 1. session -> user ID
+    # 2. session -> session version
+    # 3. user -> current session version
+    assert fake_redis.get.await_count == 3
