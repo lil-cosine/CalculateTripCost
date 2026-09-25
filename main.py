@@ -167,17 +167,17 @@ async def startup_event():
 def hash_token(token: str) -> str:
   return hashlib.sha256(token.encode()).hexdigest()
 
-async def create_session(user_id: int, connection) -> tuple[str, datetime]:
+async def create_session(user_id: int) -> str:
     token = secrets.token_urlsafe(32)
     token_hash = hash_token(token)
-    now = datetime.utcnow()
-    expires_at = now + SESSION_DURATION
 
-    await connection.execute(
-        "INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES ($1, $2, $3, $4)",
-        token_hash, user_id, now, expires_at
+    await redis_client.set(
+        f"session:{token_hash}",
+        user_id,
+        ex=7*24*60*60
     )
-    return token, expires_at
+
+    return token
 
 async def get_current_user(request: Request) -> dict:
     token = request.cookies.get(SESSION_COOKIE_NAME)
@@ -186,23 +186,17 @@ async def get_current_user(request: Request) -> dict:
 
     token_hash = hash_token(token)
 
-    pool = await get_db_connection()
-    async with pool.acquire() as connection:
-        row = await connection.fetchrow("""
-            SELECT u.id, u.email, s.expires_at
-            FROM sessions s
-            JOIN users u ON u.id = s.user_id
-            WHERE s.token = $1
-        """, token_hash)
+    user_id = await redis_client.get(
+        f"session:{token_hash}"
+    )
 
-        if not row:
-            raise HTTPException(status_code=401, detail="Invalid session")
+    if user_id is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or expired session"
+        )
 
-        if row["expires_at"] < datetime.utcnow():
-            await connection.execute("DELETE FROM sessions WHERE token = $1", token)
-            raise HTTPException(status_code=401, detail="Session expired")
-
-        return {"id": row["id"], "email": row["email"]}
+    return {"id": int(user_id)}
 
 # ---------------------------------------------------------------------------
 # Auth endpoints
@@ -252,7 +246,7 @@ async def login(user_data: UserLogin, response: Response):
         if not user or not pwd_context.verify(user_data.password, user["password_hash"]):
             raise HTTPException(status_code=401, detail="Invalid email or password")
 
-        token, expires_at = await create_session(user["id"], connection)
+        token = await create_session(user["id"])
 
         response.set_cookie(
             key=SESSION_COOKIE_NAME,
@@ -270,9 +264,9 @@ async def logout(request: Request, response: Response):
     token = request.cookies.get(SESSION_COOKIE_NAME)
     if token:
         token_hash = hash_token(token)
-        pool = await get_db_connection()
-        async with pool.acquire() as connection:
-            await connection.execute("DELETE FROM sessions WHERE token = $1", token_hash)
+        await redis_client.delete(
+            f"session:{token_hash}"
+        )
 
     response.delete_cookie(SESSION_COOKIE_NAME)
     return {"message": "Logged out"}
@@ -395,7 +389,7 @@ async def update_password(password_data: PasswordUpdate, current_user: dict = De
 # Gas price / calculation logic (unchanged)
 # ---------------------------------------------------------------------------
 
-async def get_gas_prices(state_code: str, connection) -> float:
+async def get_gas_prices(state_code: str) -> float:
     cache_key = f"gas_price:{state_code}"
 
     cache_price = await redis_client.get(cache_key)
@@ -480,7 +474,7 @@ async def calculate_drive_cost(trip_data: TripData, current_user: dict = Depends
     pool = await get_db_connection()
     async with pool.acquire() as connection:
         try:
-            gas_price = await get_gas_prices(trip_data.state_code, connection)
+            gas_price = await get_gas_prices(trip_data.state_code)
             result = calculate_trip_cost(trip_data, gas_price)
 
             await connection.execute(
