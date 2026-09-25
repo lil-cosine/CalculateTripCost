@@ -120,15 +120,6 @@ async def init_db():
           """)
 
         await connection.execute("""
-            CREATE TABLE IF NOT EXISTS sessions (
-                token VARCHAR(64) PRIMARY KEY,
-                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                created_at TIMESTAMP NOT NULL,
-                expires_at TIMESTAMP NOT NULL
-            )
-        """)
-
-        await connection.execute("""
             CREATE TABLE IF NOT EXISTS calculations (
                 id SERIAL PRIMARY KEY,
                 user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -198,12 +189,37 @@ async def get_current_user(request: Request) -> dict:
 
     return {"id": int(user_id)}
 
+async def check_rate_limit(
+    key: str,
+    limit: int,
+    window: int
+):
+    current = await redis_client.incr(key)
+
+    if current == 1:
+        await redis_client.expire(key, window)
+
+    if current > limit:
+        ttl = await redis_client.ttl(key)
+        raise HTTPException(
+            status_code=429,
+            detail=f"Too many requests. Try again in {ttl} seconds."
+        )
+
 # ---------------------------------------------------------------------------
 # Auth endpoints
 # ---------------------------------------------------------------------------
 
 @app.post("/api/register/")
-async def register(user_data: UserRegister, response: Response):
+async def register(user_data: UserRegister, request: Request, response: Response):
+    client_ip = request.client.host
+
+    await check_rate_limit(
+        key=f"rate_limit:register:{client_ip}",
+        limit=5,
+        window=60
+    )
+
     pool = await get_db_connection()
     async with pool.acquire() as connection:
         existing = await connection.fetchrow(
@@ -222,7 +238,7 @@ async def register(user_data: UserRegister, response: Response):
             user_data.email, password_hash
         )
 
-        token, expires_at = await create_session(new_user["id"], connection)
+        token = await create_session(new_user["id"])
 
         response.set_cookie(
             key=SESSION_COOKIE_NAME,
@@ -236,7 +252,14 @@ async def register(user_data: UserRegister, response: Response):
         return {"id": new_user["id"], "email": new_user["email"]}
 
 @app.post("/api/login/")
-async def login(user_data: UserLogin, response: Response):
+async def login(user_data: UserLogin, request: Request, response: Response):
+    client_ip = request.client.host
+
+    await check_rate_limit(
+        key=f"rate_limit:login:{client_ip}",
+        limit=5,
+        window=60
+    )
     pool = await get_db_connection()
     async with pool.acquire() as connection:
         user = await connection.fetchrow(
@@ -357,6 +380,11 @@ async def remove_car(car_id: int, current_user: dict = Depends(get_current_user)
 
 @app.post("/api/update-password/")
 async def update_password(password_data: PasswordUpdate, current_user: dict = Depends(get_current_user)):
+    await check_rate_limit(
+        key=f"rate_limit:update_password:{current_user}",
+        limit=5,
+        window=60
+    )
     pool = await get_db_connection()
     async with pool.acquire() as connection:
         try:
@@ -470,7 +498,19 @@ def calculate_trip_cost(trip_data: TripData, gas_price: float):
 # ---------------------------------------------------------------------------
 
 @app.post("/api/calculate/")
-async def calculate_drive_cost(trip_data: TripData, current_user: dict = Depends(get_current_user)):
+async def calculate_drive_cost(trip_data: TripData, request: Request, current_user: dict = Depends(get_current_user)):
+    client_ip = request.client.host
+    await check_rate_limit(
+        key=f"rate_limit:calculate_ip:{client_ip}",
+        limit=10,
+        window=60
+    )
+    await check_rate_limit(
+        key=f"rate_limit:calculate_user:{current_user}",
+        limit=30,
+        window=60
+    )
+
     pool = await get_db_connection()
     async with pool.acquire() as connection:
         try:
