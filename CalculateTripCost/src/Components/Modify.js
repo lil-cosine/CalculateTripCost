@@ -1,7 +1,5 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
-
-const API_BASE_URL = "";
+import { useAuth } from "./AuthContext";
 
 export default function Modify() {
   const [allDrives, setAllDrives] = useState([]);
@@ -12,6 +10,7 @@ export default function Modify() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const  { apiFetch } = useAuth();
 
   const [sortConfig, setSortConfig] = useState({
     key: "start_time",
@@ -28,9 +27,7 @@ export default function Modify() {
     setLoading(true);
 
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/history/`, {
-        withCredentials: true,
-      });
+      const res = await apiFetch(`/api/history/`);
 
       setAllDrives(res.data);
       setError("");
@@ -103,10 +100,13 @@ export default function Modify() {
     setSaving(true);
 
     try {
-      const response = await axios.put(
-        `${API_BASE_URL}/api/update-entry/${id}`,
-        editData,
-        { withCredentials: true }
+      const response = await apiFetch(
+          `/api/update-entry/${id}`, {
+              headers: {
+                  "Content-Type": "application/json",
+              },
+              body: JSON.stringify(editData)
+        }
       );
 
       setAllDrives((prev) =>
@@ -135,11 +135,10 @@ export default function Modify() {
     setDeleting(id);
 
     try {
-      await axios.put(
-        `${API_BASE_URL}/api/delete-entry/${id}`,
-        {},
-        { withCredentials: true }
-      );
+      await apiFetch(
+          `/api/delete-entry/${id}`, {
+          method: "POST",
+          });
 
       setAllDrives((prev) =>
         prev.filter((item) => item.id !== id)

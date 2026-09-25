@@ -1,21 +1,29 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
-
-const API_BASE_URL = "";
+import { useAuth } from "./AuthContext";
 
 export default function User() {
+  const { apiFetch } = useAuth();
+
   // Cars state
   const [cars, setCars] = useState([]);
   const [carsLoading, setCarsLoading] = useState(false);
   const [carsError, setCarsError] = useState("");
 
   // Add-car form state
-  const [newCar, setNewCar] = useState({ name: "", highway_mpg: "", city_mpg: "" });
+  const [newCar, setNewCar] = useState({
+    name: "",
+    highway_mpg: "",
+    city_mpg: "",
+  });
   const [addingCar, setAddingCar] = useState(false);
 
   // Edit-car state
   const [editingCarId, setEditingCarId] = useState(null);
-  const [editCarForm, setEditCarForm] = useState({ name: "", highway_mpg: "", city_mpg: "" });
+  const [editCarForm, setEditCarForm] = useState({
+    name: "",
+    highway_mpg: "",
+    city_mpg: "",
+  });
   const [savingCarId, setSavingCarId] = useState(null);
   const [deletingCarId, setDeletingCarId] = useState(null);
 
@@ -35,12 +43,20 @@ export default function User() {
 
   const fetchCars = async () => {
     setCarsLoading(true);
+
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/my-cars/`, { withCredentials: true });
-      setCars(res.data);
+      const res = await apiFetch("/api/my-cars/");
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Failed to fetch vehicles");
+      }
+
+      const data = await res.json();
+      setCars(data);
       setCarsError("");
     } catch (err) {
-      setCarsError(err.response?.data?.detail || "Failed to fetch vehicles");
+      setCarsError(err.message || "Failed to fetch vehicles");
     } finally {
       setCarsLoading(false);
     }
@@ -50,20 +66,34 @@ export default function User() {
     e.preventDefault();
     setCarsError("");
     setAddingCar(true);
+
     try {
-      await axios.post(
-        `${API_BASE_URL}/api/add-car/`,
-        {
+      const res = await apiFetch("/api/add-car/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
           name: newCar.name,
           highway_mpg: parseFloat(newCar.highway_mpg),
           city_mpg: parseFloat(newCar.city_mpg),
-        },
-        { withCredentials: true }
-      );
-      setNewCar({ name: "", highway_mpg: "", city_mpg: "" });
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Failed to add vehicle");
+      }
+
+      setNewCar({
+        name: "",
+        highway_mpg: "",
+        city_mpg: "",
+      });
+
       await fetchCars();
     } catch (err) {
-      setCarsError(err.response?.data?.detail || "Failed to add vehicle");
+      setCarsError(err.message || "Failed to add vehicle");
     } finally {
       setAddingCar(false);
     }
@@ -80,26 +110,39 @@ export default function User() {
 
   const cancelEditingCar = () => {
     setEditingCarId(null);
-    setEditCarForm({ name: "", highway_mpg: "", city_mpg: "" });
+    setEditCarForm({
+      name: "",
+      highway_mpg: "",
+      city_mpg: "",
+    });
   };
 
   const handleSaveCar = async (carId) => {
     setCarsError("");
     setSavingCarId(carId);
+
     try {
-      await axios.put(
-        `${API_BASE_URL}/api/modify-car/${carId}`,
-        {
+      const res = await apiFetch(`/api/modify-car/${carId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
           name: editCarForm.name,
           highway_mpg: parseFloat(editCarForm.highway_mpg),
           city_mpg: parseFloat(editCarForm.city_mpg),
-        },
-        { withCredentials: true }
-      );
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Failed to update vehicle");
+      }
+
       setEditingCarId(null);
       await fetchCars();
     } catch (err) {
-      setCarsError(err.response?.data?.detail || "Failed to update vehicle");
+      setCarsError(err.message || "Failed to update vehicle");
     } finally {
       setSavingCarId(null);
     }
@@ -108,11 +151,20 @@ export default function User() {
   const handleDeleteCar = async (carId) => {
     setCarsError("");
     setDeletingCarId(carId);
+
     try {
-      await axios.put(`${API_BASE_URL}/api/remove-car/${carId}`, {}, { withCredentials: true });
+      const res = await apiFetch(`/api/remove-car/${carId}`, {
+        method: "PUT",
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Failed to delete vehicle");
+      }
+
       await fetchCars();
     } catch (err) {
-      setCarsError(err.response?.data?.detail || "Failed to delete vehicle");
+      setCarsError(err.message || "Failed to delete vehicle");
     } finally {
       setDeletingCarId(null);
     }
@@ -127,25 +179,40 @@ export default function User() {
       setPasswordError("New passwords do not match");
       return;
     }
+
     if (passwordForm.new_password.length < 8) {
       setPasswordError("New password must be at least 8 characters");
       return;
     }
 
     setChangingPassword(true);
+
     try {
-      await axios.post(
-        `${API_BASE_URL}/api/update-password/`,
-        {
+      const res = await apiFetch("/api/update-password/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
           current_password: passwordForm.current_password,
           new_password: passwordForm.new_password,
-        },
-        { withCredentials: true }
-      );
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Failed to update password");
+      }
+
       setPasswordSuccess("Password updated successfully");
-      setPasswordForm({ current_password: "", new_password: "", confirm_password: "" });
+
+      setPasswordForm({
+        current_password: "",
+        new_password: "",
+        confirm_password: "",
+      });
     } catch (err) {
-      setPasswordError(err.response?.data?.detail || "Failed to update password");
+      setPasswordError(err.message || "Failed to update password");
     } finally {
       setChangingPassword(false);
     }
@@ -159,7 +226,10 @@ export default function User() {
       {/* Vehicles Section */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold text-gray-900">Manage Vehicles</h1>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Manage Vehicles
+          </h1>
+
           <button
             onClick={fetchCars}
             disabled={carsLoading}
@@ -184,41 +254,59 @@ export default function User() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Name
                   </th>
+
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Highway MPG
                   </th>
+
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     City MPG
                   </th>
+
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
+
               <tbody className="divide-y divide-gray-200">
                 {cars.length === 0 && !carsLoading && (
                   <tr>
-                    <td colSpan={4} className="px-4 py-8 text-center text-gray-400 italic text-sm">
+                    <td
+                      colSpan={4}
+                      className="px-4 py-8 text-center text-gray-400 italic text-sm"
+                    >
                       No vehicles added yet
                     </td>
                   </tr>
                 )}
+
                 {cars.map((car) => {
                   const isEditing = editingCarId === car.id;
+
                   return (
-                    <tr key={car.id} className="hover:bg-gray-50 transition-colors duration-150">
+                    <tr
+                      key={car.id}
+                      className="hover:bg-gray-50 transition-colors duration-150"
+                    >
                       <td className="px-4 py-3 text-sm text-gray-900">
                         {isEditing ? (
                           <input
                             type="text"
                             value={editCarForm.name}
-                            onChange={(e) => setEditCarForm({ ...editCarForm, name: e.target.value })}
+                            onChange={(e) =>
+                              setEditCarForm({
+                                ...editCarForm,
+                                name: e.target.value,
+                              })
+                            }
                             className={inputClass}
                           />
                         ) : (
                           <span className="font-medium">{car.name}</span>
                         )}
                       </td>
+
                       <td className="px-4 py-3 text-sm text-gray-900">
                         {isEditing ? (
                           <input
@@ -226,7 +314,10 @@ export default function User() {
                             step="0.1"
                             value={editCarForm.highway_mpg}
                             onChange={(e) =>
-                              setEditCarForm({ ...editCarForm, highway_mpg: e.target.value })
+                              setEditCarForm({
+                                ...editCarForm,
+                                highway_mpg: e.target.value,
+                              })
                             }
                             className={inputClass}
                           />
@@ -236,6 +327,7 @@ export default function User() {
                           </span>
                         )}
                       </td>
+
                       <td className="px-4 py-3 text-sm text-gray-900">
                         {isEditing ? (
                           <input
@@ -243,7 +335,10 @@ export default function User() {
                             step="0.1"
                             value={editCarForm.city_mpg}
                             onChange={(e) =>
-                              setEditCarForm({ ...editCarForm, city_mpg: e.target.value })
+                              setEditCarForm({
+                                ...editCarForm,
+                                city_mpg: e.target.value,
+                              })
                             }
                             className={inputClass}
                           />
@@ -253,6 +348,7 @@ export default function User() {
                           </span>
                         )}
                       </td>
+
                       <td className="px-4 py-3 text-sm text-right whitespace-nowrap">
                         {isEditing ? (
                           <div className="flex justify-end gap-2">
@@ -263,6 +359,7 @@ export default function User() {
                             >
                               {savingCarId === car.id ? "Saving..." : "Save"}
                             </button>
+
                             <button
                               onClick={cancelEditingCar}
                               className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs px-3 py-1.5 rounded-lg transition-colors duration-200"
@@ -278,12 +375,15 @@ export default function User() {
                             >
                               Edit
                             </button>
+
                             <button
                               onClick={() => handleDeleteCar(car.id)}
                               disabled={deletingCarId === car.id}
                               className="bg-red-50 hover:bg-red-100 text-red-700 text-xs px-3 py-1.5 rounded-lg transition-colors duration-200 disabled:opacity-50"
                             >
-                              {deletingCarId === car.id ? "Deleting..." : "Delete"}
+                              {deletingCarId === car.id
+                                ? "Deleting..."
+                                : "Delete"}
                             </button>
                           </div>
                         )}
@@ -298,49 +398,76 @@ export default function User() {
 
         {/* Add car form */}
         <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">Add Vehicle</h2>
-          <form onSubmit={handleAddCar} className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
+          <h2 className="text-lg font-semibold text-gray-800 mb-4">
+            Add Vehicle
+          </h2>
+
+          <form
+            onSubmit={handleAddCar}
+            className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end"
+          >
             <div className="sm:col-span-2">
               <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
                 Name
               </label>
+
               <input
                 type="text"
                 placeholder="e.g. 2019 Honda Civic"
                 value={newCar.name}
-                onChange={(e) => setNewCar({ ...newCar, name: e.target.value })}
+                onChange={(e) =>
+                  setNewCar({
+                    ...newCar,
+                    name: e.target.value,
+                  })
+                }
                 required
                 className={inputClass}
               />
             </div>
+
             <div>
               <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
                 Highway MPG
               </label>
+
               <input
                 type="number"
                 step="0.1"
                 placeholder="36"
                 value={newCar.highway_mpg}
-                onChange={(e) => setNewCar({ ...newCar, highway_mpg: e.target.value })}
+                onChange={(e) =>
+                  setNewCar({
+                    ...newCar,
+                    highway_mpg: e.target.value,
+                  })
+                }
                 required
                 className={inputClass}
               />
             </div>
+
             <div>
               <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
                 City MPG
               </label>
+
               <input
                 type="number"
                 step="0.1"
                 placeholder="28"
                 value={newCar.city_mpg}
-                onChange={(e) => setNewCar({ ...newCar, city_mpg: e.target.value })}
+                onChange={(e) =>
+                  setNewCar({
+                    ...newCar,
+                    city_mpg: e.target.value,
+                  })
+                }
                 required
                 className={inputClass}
               />
             </div>
+
             <div className="sm:col-span-4">
               <button
                 type="submit"
@@ -356,46 +483,63 @@ export default function User() {
 
       {/* Change Password Section */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-4">Change Password</h1>
+        <h1 className="text-2xl font-bold text-gray-900 mb-4">
+          Change Password
+        </h1>
+
         <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 max-w-md">
           <form onSubmit={handleChangePassword} className="space-y-4">
             <div>
               <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
                 Current Password
               </label>
+
               <input
                 type="password"
                 value={passwordForm.current_password}
                 onChange={(e) =>
-                  setPasswordForm({ ...passwordForm, current_password: e.target.value })
+                  setPasswordForm({
+                    ...passwordForm,
+                    current_password: e.target.value,
+                  })
                 }
                 required
                 className={inputClass}
               />
             </div>
+
             <div>
               <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
                 New Password
               </label>
+
               <input
                 type="password"
                 value={passwordForm.new_password}
                 onChange={(e) =>
-                  setPasswordForm({ ...passwordForm, new_password: e.target.value })
+                  setPasswordForm({
+                    ...passwordForm,
+                    new_password: e.target.value,
+                  })
                 }
                 required
                 className={inputClass}
               />
             </div>
+
             <div>
               <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
                 Confirm New Password
               </label>
+
               <input
                 type="password"
                 value={passwordForm.confirm_password}
                 onChange={(e) =>
-                  setPasswordForm({ ...passwordForm, confirm_password: e.target.value })
+                  setPasswordForm({
+                    ...passwordForm,
+                    confirm_password: e.target.value,
+                  })
                 }
                 required
                 className={inputClass}
@@ -407,6 +551,7 @@ export default function User() {
                 <strong>Error:</strong> {passwordError}
               </div>
             )}
+
             {passwordSuccess && (
               <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
                 {passwordSuccess}

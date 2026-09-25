@@ -7,12 +7,19 @@ import Login from "../Components/Login";
 import Register from "../Components/Register";
 import User from "../Components/User"
 import { useAuth } from "./AuthContext";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 function App() {
   const { user, loading, logout } = useAuth();
   const [activeSection, setActiveSection] = useState("stats");
   const [authView, setAuthView] = useState("login");
+
+  useEffect(() => {
+    if (!user) {
+      setAuthView("login");
+      setActiveSection("stats");
+    }
+  }, [user]);
 
   if (loading) {
     return <div className="App-loading">Loading...</div>;

@@ -74,8 +74,21 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
+  const apiFetch = async (url, options = {}) => {
+    const res = await fetch(`${API_BASE}${url}`, {
+      ...options,
+      credentials: "include",
+    });
+
+    if (res.status === 401) {
+      setUser(null);
+    }
+
+    return res;
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, apiFetch }}>
       {children}
     </AuthContext.Provider>
   );

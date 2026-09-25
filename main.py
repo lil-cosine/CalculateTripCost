@@ -162,18 +162,40 @@ async def create_session(user_id: int) -> str:
     token = secrets.token_urlsafe(32)
     token_hash = hash_token(token)
 
+    session_version = await redis_client.get(
+        f"user_session_version:{user_id}"
+    )
+
+    if session_version is None:
+        session_version = "0"
+        await redis_client.set(
+            f"user_session_version:{user_id}",
+            session_version
+        )
+
     await redis_client.set(
         f"session:{token_hash}",
         user_id,
         ex=SESSION_DURATION
     )
 
+    await redis_client.set(
+        f"session_version:{token_hash}",
+        session_version,
+        ex=SESSION_DURATION
+    )
+
     return token
+
 
 async def get_current_user(request: Request) -> dict:
     token = request.cookies.get(SESSION_COOKIE_NAME)
+
     if not token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
+        raise HTTPException(
+            status_code=401,
+            detail="Not authenticated"
+        )
 
     token_hash = hash_token(token)
 
@@ -185,6 +207,25 @@ async def get_current_user(request: Request) -> dict:
         raise HTTPException(
             status_code=401,
             detail="Invalid or expired session"
+        )
+
+    session_version = await redis_client.get(
+        f"session_version:{token_hash}"
+    )
+
+    current_version = await redis_client.get(
+        f"user_session_version:{user_id}"
+    )
+
+    if session_version != current_version:
+        await redis_client.delete(
+            f"session:{token_hash}",
+            f"session_version:{token_hash}"
+        )
+
+        raise HTTPException(
+            status_code=401,
+            detail="Session invalidated"
         )
 
     return {"id": int(user_id)}
@@ -294,7 +335,8 @@ async def logout(request: Request, response: Response):
     if token:
         token_hash = hash_token(token)
         await redis_client.delete(
-            f"session:{token_hash}"
+            f"session:{token_hash}",
+            f"session_version:{token_hash}"
         )
 
     response.delete_cookie(SESSION_COOKIE_NAME)
@@ -385,39 +427,79 @@ async def remove_car(car_id: int, current_user: dict = Depends(get_current_user)
             raise HTTPException(status_code=500, detail="An internal server error occurred")
 
 @app.post("/api/update-password/")
-async def update_password(password_data: PasswordUpdate, current_user: dict = Depends(get_current_user)):
+async def update_password(
+    password_data: PasswordUpdate,
+    request: Request,
+    response: Response,
+    current_user: dict = Depends(get_current_user)
+):
+    user_id = current_user["id"]
+
     await check_rate_limit(
-        key=f"rate_limit:update_password:{current_user}",
+        key=f"rate_limit:update_password:{user_id}",
         limit=5,
         window=60
     )
+
     pool = await get_db_connection()
+
     async with pool.acquire() as connection:
         try:
             user = await connection.fetchrow(
-                "SELECT password_hash FROM users WHERE id = $1", current_user["id"]
+                "SELECT password_hash FROM users WHERE id = $1",
+                user_id
             )
-            if not user or not pwd_context.verify(password_data.current_password, user["password_hash"]):
-                raise HTTPException(status_code=401, detail="Current password is incorrect")
+
+            if not user or not pwd_context.verify(
+                password_data.current_password,
+                user["password_hash"]
+            ):
+                raise HTTPException(
+                    status_code=401,
+                    detail="Current password is incorrect"
+                )
 
             if len(password_data.new_password) < 8:
-                raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+                raise HTTPException(
+                    status_code=400,
+                    detail="Password must be at least 8 characters"
+                )
 
             new_hash = pwd_context.hash(password_data.new_password)
-            await connection.execute(
-                "UPDATE users SET password_hash = $1 WHERE id = $2",
-                new_hash, current_user["id"]
-            )
 
             await connection.execute(
-              "DELETE FROM sessions WHERE user_id = $1",
-              current_user["id"]
+                "UPDATE users SET password_hash = $1 WHERE id = $2",
+                new_hash,
+                user_id
             )
-            return {"message": "Password updated successfully"}
+
+            token = request.cookies.get(SESSION_COOKIE_NAME)
+
+            if token:
+                token_hash = hash_token(token)
+
+                new_session_version = await redis_client.incr(
+                    f"user_session_version:{user_id}"
+                )
+
+                await redis_client.set(
+                    f"session_version:{token_hash}",
+                    new_session_version,
+                    ex=SESSION_DURATION
+                )
+
+            return {
+                "message": "Password updated successfully"
+            }
+
         except HTTPException:
             raise
-        except Exception as e:
-            raise HTTPException(status_code=500, detail="An internal server error occurred")
+
+        except Exception:
+            raise HTTPException(
+                status_code=500,
+                detail="An internal server error occurred"
+            )
 
 # ---------------------------------------------------------------------------
 # Gas price / calculation logic (unchanged)

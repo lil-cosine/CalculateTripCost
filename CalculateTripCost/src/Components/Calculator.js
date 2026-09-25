@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
-
-const API_BASE_URL = "";
+import { useAuth } from "./AuthContext";
 
 const driveTypes = [
   { id: "required", name: "Required (Work/Errands)" },
@@ -9,6 +7,7 @@ const driveTypes = [
 ];
 
 function Calculator() {
+  const  { apiFetch } = useAuth();
   const [formData, setFormData] = useState({
     miles: "",
     car_id: "1",
@@ -26,9 +25,7 @@ function Calculator() {
 
   const getCars = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/my-cars/`, {
-        credentials: "include",
-      });
+      const res = await apiFetch(`/api/my-cars/`);
       if (res.ok) {
         const data = await res.json();
         setCars(data);
@@ -80,14 +77,23 @@ function Calculator() {
     };
 
     try {
-      const response = await axios.post(
-        `${API_BASE_URL}/api/calculate/`,
-        submitData,
-        { withCredentials: true }
-      );
-      setResult(response.data);
+      const response = await apiFetch("/api/calculate/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(submitData),
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || "An unexpected error occurred");
+      }
+
+      const data = await response.json();
+      setResult(data);
     } catch (err) {
-      setError(err.response?.data?.detail || "An unexpected error occurred");
+      setError(err.message || "An unexpected error occurred");
     } finally {
       setLoading(false);
     }
