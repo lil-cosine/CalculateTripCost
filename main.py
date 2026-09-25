@@ -256,7 +256,13 @@ async def login(user_data: UserLogin, request: Request, response: Response):
     client_ip = request.client.host
 
     await check_rate_limit(
-        key=f"rate_limit:login:{client_ip}",
+        key=f"rate_limit:login:email:{user_data.email}",
+        limit=5,
+        window=60
+    )
+
+    await check_rate_limit(
+        key=f"rate_limit:login:ip:{client_ip}",
         limit=5,
         window=60
     )
@@ -501,12 +507,12 @@ def calculate_trip_cost(trip_data: TripData, gas_price: float):
 async def calculate_drive_cost(trip_data: TripData, request: Request, current_user: dict = Depends(get_current_user)):
     client_ip = request.client.host
     await check_rate_limit(
-        key=f"rate_limit:calculate_ip:{client_ip}",
+        key=f"rate_limit:calculate:ip:{client_ip}",
         limit=10,
         window=60
     )
     await check_rate_limit(
-        key=f"rate_limit:calculate_user:{current_user}",
+        key=f"rate_limit:calculate:user:{current_user}",
         limit=30,
         window=60
     )
