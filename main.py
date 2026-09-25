@@ -10,6 +10,7 @@ import asyncpg
 import os
 import secrets
 import hashlib
+import redis.asyncio as redis
 
 load_dotenv()
 
@@ -69,6 +70,13 @@ EIA_API_KEY = os.getenv("EIA_API_KEY")
 COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").lower() == "true"
 SESSION_COOKIE_NAME = "session_token"
 SESSION_DURATION = timedelta(days=7)
+
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+
+redis_client = redis.from_url(
+    REDIS_URL,
+    decode_responses=True
+)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -146,13 +154,6 @@ async def init_db():
             ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE
         """)
 
-        await connection.execute("""
-            CREATE TABLE IF NOT EXISTS gas_prices (
-                state VARCHAR(2) PRIMARY KEY,
-                price FLOAT NOT NULL,
-                last_updated TIMESTAMP NOT NULL
-            )
-        """)
     print("Database initialized")
 
 @app.on_event("startup")
@@ -395,16 +396,12 @@ async def update_password(password_data: PasswordUpdate, current_user: dict = De
 # ---------------------------------------------------------------------------
 
 async def get_gas_prices(state_code: str, connection) -> float:
-    now = datetime.utcnow()
+    cache_key = f"gas_price:{state_code}"
 
-    cached_data = await connection.fetchrow(
-        "SELECT price, last_updated FROM gas_prices WHERE state = $1", state_code
-    )
+    cache_price = await redis_client.get(cache_key)
 
-    if cached_data:
-        last_updated = cached_data['last_updated']
-        if now - last_updated < timedelta(hours=24):
-            return float(cached_data['price'])
+    if cache_price is not None:
+        return float(cache_price)
 
     print(f"Fetching newest price data for {state_code}")
 
@@ -444,13 +441,11 @@ async def get_gas_prices(state_code: str, connection) -> float:
         except (TypeError, ValueError, IndexError):
             raise HTTPException(status_code=500, detail="Invalid gas price data format")
 
-        await connection.execute("""
-            INSERT INTO gas_prices(state, price, last_updated)
-            VALUES ($1, $2, $3)
-            ON CONFLICT (state) DO UPDATE SET
-                price = EXCLUDED.price,
-                last_updated = EXCLUDED.last_updated
-        """, state_code, current_price, now)
+        await redis_client.set(
+            cache_key,
+            current_price,
+            ex= 60 * 60 * 24
+        )
 
         return current_price
 
