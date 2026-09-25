@@ -69,7 +69,7 @@ EIA_API_KEY = os.getenv("EIA_API_KEY")
 # Set to True once you're serving over HTTPS in production
 COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").lower() == "true"
 SESSION_COOKIE_NAME = "session_token"
-SESSION_DURATION = timedelta(days=7)
+SESSION_DURATION = 7*24*60*60
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 
@@ -165,7 +165,7 @@ async def create_session(user_id: int) -> str:
     await redis_client.set(
         f"session:{token_hash}",
         user_id,
-        ex=7*24*60*60
+        ex=SESSION_DURATION
     )
 
     return token
@@ -246,7 +246,7 @@ async def register(user_data: UserRegister, request: Request, response: Response
             httponly=True,
             secure=COOKIE_SECURE,
             samesite="lax",
-            max_age=int(SESSION_DURATION.total_seconds()),
+            max_age=SESSION_DURATION,
         )
 
         return {"id": new_user["id"], "email": new_user["email"]}
@@ -277,7 +277,7 @@ async def login(user_data: UserLogin, request: Request, response: Response):
             httponly=True,
             secure=COOKIE_SECURE,
             samesite="lax",
-            max_age=int(SESSION_DURATION.total_seconds()),
+            max_age=SESSION_DURATION,
         )
 
         return {"id": user["id"], "email": user["email"]}
